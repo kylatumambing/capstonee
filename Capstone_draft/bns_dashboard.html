@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>BNS Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .table-container th, .table-container td { padding:6px 8px; font-size:13px; border-bottom:1px solid #ddd; }
+  .vaccine-btn { padding:2px 6px; font-size:12px; border-radius:4px; border:none; cursor:default; }
+  .vaccine-btn.accepted { background-color:#90ee90; color:black; }
+  .vaccine-btn.needed { background-color:#f39c12; color:white; }
+  .tab-btn { cursor:pointer; margin-right:10px; padding:5px 10px; }
+  .tab-btn.active { background-color:#007bff; color:white; }
+  .tab-content { display:none; margin-top:20px; }
+  .tab-content.active { display:block; }
+</style>
+</head>
+<body>
+
+<header class="navbar">
+  <a class="brand" href="bns_dashboard.html">
+    <img src="assets/logo.png" alt="Logo" class="logo" />
+    <span class="brand-name">BNS</span>
+  </a>
+  <nav>
+    <a href="login.html" class="btn danger">Logout</a>
+  </nav>
+</header>
+
+<main class="container">
+  <h2>BNS Dashboard</h2>
+  <p>Barangay: <strong id="bnsBarangay"></strong> (All Sectors)</p>
+
+  <div>
+    <button class="tab-btn active" onclick="openTab('childrenTab', this)">Children Records</button>
+    <button class="tab-btn" onclick="openTab('profileTab', this)">BHW Profiles</button>
+  </div>
+
+  <!-- Children Records Tab -->
+  <div id="childrenTab" class="tab-content active">
+    <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+      <label for="bhwFilter">Filter by BHW:</label>
+      <select id="bhwFilter" onchange="filterByBHW()">
+        <option value="all">All BHWs</option>
+      </select>
+
+      <label for="reportType">Download as:</label>
+      <select id="reportType">
+        <option value="csv">CSV</option>
+        <option value="xlsx">Excel (.xlsx)</option>
+      </select>
+      <button class="btn" onclick="downloadReport()">Download Report</button>
+    </div>
+
+    <div class="table-container" style="overflow-x:auto; margin-top:10px;">
+      <table class="table" id="childrenTable">
+        <thead>
+          <tr>
+            <th>Child Name</th>
+            <th>Age in months</th>
+            <th>Parent Name</th>
+            <th>Barangay</th>
+            <th>Sector</th>
+            <th>BCG</th><th>HEPA B</th><th>PENTA 1</th><th>PENTA 2</th><th>PENTA 3</th>
+            <th>OPV1</th><th>OPV2</th><th>OPV3</th><th>IPV1</th><th>IPV2</th>
+            <th>PCV1</th><th>PCV2</th><th>PCV3</th><th>MCV1</th><th>MCV2</th>
+            <th>BHW Email</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BHW Profiles Tab -->
+  <div id="profileTab" class="tab-content">
+    <div class="table-container" style="overflow-x:auto;">
+      <table class="table" id="profileTable">
+        <thead>
+          <tr>
+            <th>Name</th><th>Email</th><th>Barangay</th><th>Sector</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container"><small>&copy; <span id="y"></span> HealthPro</small></div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+document.getElementById('y').textContent = new Date().getFullYear();
+
+// Logged-in BNS info
+const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+document.getElementById("bnsBarangay").textContent = loggedInUser.barangay || "All";
+
+// Load children and BHW profiles
+// Children data is stored per barangay and sector, so we need to aggregate it for BNS
+let childrenData = [];
+const bhwBnsProfiles = JSON.parse(localStorage.getItem("bhwBnsProfiles") || "[]");
+const bhwsInBNSBarangay = bhwBnsProfiles.filter(p => p.role === "BHW" && p.barangay === loggedInUser.barangay);
+
+bhwsInBNSBarangay.forEach(bhw => {
+    const key = `hp_children_${bhw.barangay}__${bhw.sector}`;
+    const bhwChildren = JSON.parse(localStorage.getItem(key) || "[]");
+    childrenData = childrenData.concat(bhwChildren);
+});
+
+// Filter BHW profiles for the current BNS's barangay
+const bhwProfiles = bhwBnsProfiles.filter(p => p.role === "BHW" && p.barangay === loggedInUser.barangay);
+
+// Filter children for BNS barangay (initially all children from the BNS's barangay)
+let filteredChildren = childrenData;
+
+// Populate BHW dropdown
+function populateBHWFilter() {
+  const bhwFilter = document.getElementById("bhwFilter");
+  // Clear existing options except "All BHWs"
+  bhwFilter.innerHTML = '<option value="all">All BHWs</option>';
+  
+  bhwProfiles.forEach(b => {
+    const option = document.createElement("option");
+    option.value = b.email;
+    option.textContent = b.name + " (" + b.email + ")";
+    bhwFilter.appendChild(option);
+  });
+}
+
+// Filter children by selected BHW
+function filterByBHW() {
+  const selected = document.getElementById("bhwFilter").value;
+  if(selected === "all") filteredChildren = childrenData; // Show all children from the BNS's barangay
+  else filteredChildren = childrenData.filter(c => c.bhwEmail === selected);
+  renderChildrenTable();
+}
+
+// Render children table
+function renderChildrenTable() {
+  const tbody = document.querySelector("#childrenTable tbody");
+  tbody.innerHTML = "";
+  filteredChildren.forEach(c => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${c.Name || ""}</td>
+      <td>${c["Age in Months"] || ""}</td>
+      <td>${c["Name of Parent"] || ""}</td>
+      <td>${c.Barangay || ""}</td>
+      <td>${c.Sector || ""}</td>
+      <td><button class="vaccine-btn ${c.BCG==="Accepted"?"accepted":"needed"}" disabled>${c.BCG}</button></td>
+      <td><button class="vaccine-btn ${c["HEPA B"]==="Accepted"?"accepted":"needed"}" disabled>${c["HEPA B"]}</button></td>
+      <td><button class="vaccine-btn ${c["PENTA 1"]==="Accepted"?"accepted":"needed"}" disabled>${c["PENTA 1"]}</button></td>
+      <td><button class="vaccine-btn ${c["PENTA 2"]==="Accepted"?"accepted":"needed"}" disabled>${c["PENTA 2"]}</button></td>
+      <td><button class="vaccine-btn ${c["PENTA 3"]==="Accepted"?"accepted":"needed"}" disabled>${c["PENTA 3"]}</button></td>
+      <td><button class="vaccine-btn ${c["OPV1"]==="Accepted"?"accepted":"needed"}" disabled>${c["OPV1"]}</button></td>
+      <td><button class="vaccine-btn ${c["OPV2"]==="Accepted"?"accepted":"needed"}" disabled>${c["OPV2"]}</button></td>
+      <td><button class="vaccine-btn ${c["OPV3"]==="Accepted"?"accepted":"needed"}" disabled>${c["OPV3"]}</button></td>
+      <td><button class="vaccine-btn ${c["IPV1"]==="Accepted"?"accepted":"needed"}" disabled>${c["IPV1"]}</button></td>
+      <td><button class="vaccine-btn ${c["IPV2"]==="Accepted"?"accepted":"needed"}" disabled>${c["IPV2"]}</button></td>
+      <td><button class="vaccine-btn ${c["PCV1"]==="Accepted"?"accepted":"needed"}" disabled>${c["PCV1"]}</button></td>
+      <td><button class="vaccine-btn ${c["PCV2"]==="Accepted"?"accepted":"needed"}" disabled>${c["PCV2"]}</button></td>
+      <td><button class="vaccine-btn ${c["PCV3"]==="Accepted"?"accepted":"needed"}" disabled>${c["PCV3"]}</button></td>
+      <td><button class="vaccine-btn ${c["MCV1"]==="Accepted"?"accepted":"needed"}" disabled>${c["MCV1"]}</button></td>
+      <td><button class="vaccine-btn ${c["MCV2"]==="Accepted"?"accepted":"needed"}" disabled>${c["MCV2"]}</button></td>
+      <td>${c.bhwEmail || ""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Render BHW profiles table
+function renderProfileTable() {
+  const tbody = document.querySelector("#profileTable tbody");
+  tbody.innerHTML = "";
+  bhwProfiles.forEach(b => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${b.name}</td><td>${b.email}</td><td>${b.barangay}</td><td>${b.sector}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Tab switcher
+function openTab(tabId, btn) {
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+  document.getElementById(tabId).classList.add("active");
+  btn.classList.add("active");
+}
+
+// Download report
+function downloadReport(){
+  if(filteredChildren.length===0){ alert("No data!"); return; }
+  const type = document.getElementById("reportType").value;
+  if(type==="csv"){
+    // Ensure all keys are included for CSV header, even if some rows don't have them
+    const allKeys = new Set();
+    filteredChildren.forEach(row => Object.keys(row).forEach(key => allKeys.add(key)));
+    const headers = Array.from(allKeys);
+
+    let csv = headers.join(",") + "\n";
+    filteredChildren.forEach(row => {
+        const values = headers.map(header => {
+            const val = row[header];
+            // Handle values that might contain commas or quotes
+            if (val === undefined || val === null) return "";
+            const s = String(val);
+            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        });
+        csv += values.join(",") + "\n";
+    });
+
+    const blob = new Blob([csv],{type:"text/csv"});
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "children_report.csv";
+    link.click();
+  } else {
+    const ws = XLSX.utils.json_to_sheet(filteredChildren);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Report");
+    XLSX.writeFile(wb,"children_report.xlsx");
+  }
+}
+
+// Initialize
+populateBHWFilter();
+renderChildrenTable();
+renderProfileTable();
+</script>
+</body>
+</html>

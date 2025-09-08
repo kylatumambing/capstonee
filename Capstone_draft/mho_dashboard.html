@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MHO — Health</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* Profile card */
+    .profile-card { display:flex;align-items:center;gap:1rem;border:1px solid #ddd;padding:1rem;border-radius:8px;margin-bottom:1rem;background:#fafafa; }
+    .profile-card img { width:60px;height:60px;border-radius:50%;background:#ccc; }
+    /* Barangay list */
+    .barangay-list button { display:block;width:100%;padding:0.75rem;margin:0.25rem 0;border:none;border-radius:6px;background:#f0f0f0;cursor:pointer;text-align:left; }
+    .barangay-list button:hover { background:#e0e0e0; }
+    /* Search bar */
+    .search-bar { margin-bottom:1rem;padding:0.5rem;width:100%;border:1px solid #ddd;border-radius:6px; }
+    /* Back button */
+    .back-btn { margin-bottom:1rem;padding:0.5rem 1rem;border:none;background:#007bff;color:#fff;border-radius:6px;cursor:pointer; }
+    /* Account form */
+    .account-form { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;padding:15px;border:1px solid #eee;border-radius:8px;background-color:#f9f9f9; }
+    .account-form label { grid-column:span 2;font-weight:bold;margin-top:5px; }
+    .account-form input,.account-form select { grid-column:span 2;padding:8px;border:1px solid #ccc;border-radius:4px; }
+    .account-form button { grid-column:span 2;padding:10px;background-color:#007bff;color:white;border:none;border-radius:5px;cursor:pointer; }
+    .account-form button:hover { background-color:#0056b3; }
+    /* Account table */
+    .account-table th,.account-table td { padding:8px;border-bottom:1px solid #ddd;text-align:left; }
+    .account-table th { background-color:#f2f2f2; }
+    .action-btn { margin-right:5px;padding:5px 10px;border:none;border-radius:4px;cursor:pointer; }
+    .edit-btn { background:#ffc107;color:#000; }
+    .delete-btn { background:#dc3545;color:#fff; }
+    /* Inventory */
+    .inventory-form { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;padding:15px;border:1px solid #eee;border-radius:8px;background:#f9f9f9; }
+    .inventory-form label { grid-column:span 2;font-weight:bold;margin-top:5px; }
+    .inventory-form input { grid-column:span 2;padding:8px;border:1px solid #ccc;border-radius:4px; }
+    .inventory-form button { grid-column:span 2;padding:10px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer; }
+    .inventory-form button:hover { background:#218838; }
+    .notification { padding:10px;margin-bottom:15px;border-radius:5px;background:#fff3cd;color:#856404;display:none; }
+    .notif-item { margin-top:5px;padding:8px;border-radius:4px;background:#fff8e1;border:1px solid #ffe082; }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <a class="brand" href="mho_dashboard.html">
+      <img src="assets/logo.png" alt="Logo" class="logo" />
+      <span class="brand-name">MHO</span>
+    </a>
+    <nav><a href="login.html" class="btn danger">Logout</a></nav>
+  </header>
+
+  <main class="container">
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="reports">Reports</button>
+      <button class="tab-btn" data-tab="accounts">Accounts</button>
+      <button class="tab-btn" data-tab="inventory">Inventory</button>
+    </nav>
+
+    <!-- Reports tab -->
+    <section id="reports" class="tab-content active">
+      <h2>Reports</h2>
+      <label for="barangaySelect">Choose Barangay:</label>
+      <select id="barangaySelect"><option value="all">All</option></select>
+      <div class="row mt-4">
+        <div class="col card canvas-card"><h3>Vaccine Completion</h3><canvas id="pieChart" width="720" height="340"></canvas></div>
+        <div class="col card canvas-card"><h3>Vaccines Given</h3><canvas id="barChart" width="720" height="340"></canvas></div>
+      </div>
+      <div class="mt-4 card">
+        <h3>Children Records</h3>
+        <div class="table-wrap" style="overflow-x:auto;">
+          <table id="mhoTable" class="table">
+            <thead><tr><th>Name</th><th>Age in months</th><th>Date of Birth</th><th>Name of Mother</th><th>BCG</th><th>HEPA B</th><th>PENTA 1</th><th>PENTA 2</th><th>PENTA 3</th><th>OPV1</th><th>OPV2</th><th>OPV3</th><th>IPV1</th><th>IPV2</th><th>PCV1</th><th>PCV2</th><th>PCV3</th><th>MCV1</th><th>MCV2</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="mhoEmpty" class="muted mt-2" style="display:none;">No records yet.</p>
+      </div>
+      <button id="downloadData" class="btn secondary mt-4">Download Data (CSV/XLS)</button>
+    </section>
+
+    <!-- Accounts tab -->
+    <section id="accounts" class="tab-content" style="display:none;">
+      <h2>Accounts Management</h2>
+      <div class="profile-card"><img src="assets/mho.png" alt="MHO"><div><strong>Municipal Health Office</strong><br>Email: mho@gmail.com<br>Password: password</div></div>
+      <h3>Create New BNS/BHW Account</h3>
+      <div class="account-form card">
+        <label for="accountName">Name:</label><input type="text" id="accountName" placeholder="Full Name">
+        <label for="accountEmail">Email (User ID):</label><input type="email" id="accountEmail" placeholder="user@example.com">
+        <label for="accountRole">Role:</label><select id="accountRole"><option value="BNS">BNS</option><option value="BHW">BHW</option></select>
+        <label for="accountBarangay">Barangay:</label><select id="accountBarangay"></select>
+        <label for="accountSector">Sector (for BHW):</label><select id="accountSector"><option value="">N/A</option><option value="Sector A">Sector A</option><option value="Sector B">Sector B</option><option value="Sector C">Sector C</option></select>
+        <label for="accountPassword">Password (Default: password):</label><input type="text" id="accountPassword" value="password" readonly>
+        <button onclick="addAccount()">Add Account</button>
+      </div>
+      <h3>Existing BNS/BHW Accounts</h3>
+      <input type="text" id="searchAccount" class="search-bar" placeholder="Search by name or email...">
+      <div class="table-wrap" style="overflow-x:auto;">
+        <table class="table account-table" id="accountsTable">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Barangay</th><th>Sector</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Inventory tab -->
+    <section id="inventory" class="tab-content" style="display:none;">
+      <h2>Vaccine Inventory</h2>
+      <div id="inventoryNotification" class="notification"></div>
+      <div class="inventory-form card">
+        <label for="vaccineName">Vaccine Name:</label><input type="text" id="vaccineName" placeholder="e.g. BCG">
+        <label for="vaccineQty">Quantity:</label><input type="number" id="vaccineQty" placeholder="e.g. 100">
+        <label for="vaccineExpiry">Expiry Date:</label><input type="date" id="vaccineExpiry">
+        <button onclick="addVaccine()">Add Vaccine</button>
+      </div>
+      <div class="table-wrap" style="overflow-x:auto;">
+        <table class="table" id="inventoryTable"><thead><tr><th>Vaccine</th><th>Quantity</th><th>Expiry Date</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer"><div class="container"><small>&copy; <span id="y"></span> HealthPro</small></div></footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    document.getElementById('y').textContent=new Date().getFullYear();
+
+    // Barangays & Sectors
+    const BARANGAYS = ["Abiacao","Bagong Tubig","Balagtasin","Balite","Banoyo","Boboy","Bonliw","Calumpang East","Calumpang West","Dulangan","Durungao","Locloc","Luya","Mahabang Parang","Manggahan","Muzon","San Antonio","San Isidro","San Jose","San Martin","Santa Monica","Taliba","Talon","Tejero","Tungal","Poblacion"];
+    const SECTORS = ["Sector A","Sector B","Sector C"];
+
+    // Populate barangay dropdowns
+    const barangaySelect=document.getElementById('accountBarangay');
+    const reportSelect=document.getElementById('barangaySelect');
+    BARANGAYS.forEach(b=>{let o=document.createElement('option');o.value=b;o.textContent=b;barangaySelect.appendChild(o);let o2=document.createElement('option');o2.value=b;o2.textContent=b;reportSelect.appendChild(o2);});
+
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(tab=>tab.style.display="none");
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).style.display="block";
+        if (btn.dataset.tab==='accounts') renderAccountsTable();
+        if (btn.dataset.tab==='inventory') renderInventory();
+      });
+    });
+
+    // ===== ACCOUNTS =====
+    let bhwBnsProfiles=JSON.parse(localStorage.getItem("bhwBnsProfiles")||"[]");
+    if(bhwBnsProfiles.length===0){const init=[];BARANGAYS.forEach(b=>{init.push({name:`${b} BNS`,email:`${b.toLowerCase().replace(/\\s/g,'')}bns@gmail.com`,password:"password",role:"BNS",barangay:b,sector:""});init.push({name:`${b} BHW 1`,email:`${b.toLowerCase().replace(/\\s/g,'')}bhw1@gmail.com`,password:"password",role:"BHW",barangay:b,sector:"Sector A"});});bhwBnsProfiles=init;localStorage.setItem("bhwBnsProfiles",JSON.stringify(bhwBnsProfiles));}
+    function saveBhwBnsProfiles(){localStorage.setItem("bhwBnsProfiles",JSON.stringify(bhwBnsProfiles));}
+    function addAccount(){const name=document.getElementById('accountName').value.trim();const email=document.getElementById('accountEmail').value.toLowerCase().trim();const role=document.getElementById('accountRole').value;const barangay=document.getElementById('accountBarangay').value;const sector=document.getElementById('accountSector').value;const password=document.getElementById('accountPassword').value;if(!name||!email||!barangay){alert('Fill in all required fields.');return;}if(bhwBnsProfiles.some(p=>p.email===email)){alert('Email exists.');return;}bhwBnsProfiles.push({name,email,password,role,barangay,sector:role==='BHW'?sector:''});saveBhwBnsProfiles();renderAccountsTable();alert('Account added!');}
+    function renderAccountsTable(filter=""){const tbody=document.querySelector('#accountsTable tbody');tbody.innerHTML='';bhwBnsProfiles.filter(p=>p.name.toLowerCase().includes(filter.toLowerCase())||p.email.toLowerCase().includes(filter.toLowerCase())).forEach((p,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${p.name}</td><td>${p.email}</td><td>${p.role}</td><td>${p.barangay}</td><td>${p.sector||'N/A'}</td><td><button class="action-btn edit-btn" onclick="editAccount(${i})">Edit</button><button class="action-btn delete-btn" onclick="deleteAccount(${i})">Delete</button></td>`;tbody.appendChild(tr);});}
+    function editAccount(i){const p=bhwBnsProfiles[i];const n=prompt('New name:',p.name);if(n) p.name=n;const e=prompt('New email:',p.email);if(e){const t=e.toLowerCase().trim();if(bhwBnsProfiles.some((pp,j)=>pp.email===t&&j!==i)){alert('Email exists');return;}p.email=t;}const r=prompt('Role (BNS/BHW):',p.role);if(r&&(r==="BNS"||r==="BHW")) p.role=r;const b=prompt('Barangay:',p.barangay);if(b) p.barangay=b;if(p.role==='BHW'){const s=prompt('Sector (A/B/C):',p.sector);if(s) p.sector=s;}saveBhwBnsProfiles();renderAccountsTable();}
+    function deleteAccount(i){if(confirm("Delete?")){bhwBnsProfiles.splice(i,1);saveBhwBnsProfiles();renderAccountsTable();}}
+    document.getElementById('searchAccount').addEventListener('input',e=>renderAccountsTable(e.target.value));
+
+    // ===== INVENTORY =====
+    let vaccineInventory=JSON.parse(localStorage.getItem("vaccineInventory")||"[]");
+    if(vaccineInventory.length===0){vaccineInventory=[{name:"BCG",quantity:15,expiry:"2025-09-20"},{name:"MMR",quantity:30,expiry:"2025-09-25"},{name:"Hepatitis B",quantity:10,expiry:"2025-10-05"}];localStorage.setItem("vaccineInventory",JSON.stringify(vaccineInventory));}
+    const barangaySchedules=[{brgy:"Abiacao",vaccine:"BCG",date:"2025-09-18"},{brgy:"Bagong Tubig",vaccine:"MMR",date:"2025-09-22"},{brgy:"Balagtasin",vaccine:"Hepatitis B",date:"2025-09-25"}];
+
+    function saveInventory(){localStorage.setItem("vaccineInventory",JSON.stringify(vaccineInventory));}
+    function addVaccine(){const name=document.getElementById('vaccineName').value.trim();const qty=parseInt(document.getElementById('vaccineQty').value);const expiry=document.getElementById('vaccineExpiry').value;if(!name||isNaN(qty)||!expiry){alert("Complete details.");return;}vaccineInventory.push({name,quantity:qty,expiry});saveInventory();renderInventory();alert("Vaccine added.");}
+    function renderInventory(){const tbody=document.querySelector('#inventoryTable tbody');tbody.innerHTML="";const today=new Date();const notif=document.getElementById("inventoryNotification");notif.innerHTML="";notif.style.display="none";vaccineInventory.forEach((v,i)=>{let status="OK";const exp=new Date(v.expiry);if(v.quantity<20) status="Low Stock";if(exp<today) status="Expired";const tr=document.createElement("tr");tr.innerHTML=`<td>${v.name}</td><td>${v.quantity}</td><td>${v.expiry}</td><td>${status}</td><td><button class="action-btn edit-btn" onclick="editVaccine(${i})">Edit</button><button class="action-btn delete-btn" onclick="deleteVaccine(${i})">Delete</button></td>`;tbody.appendChild(tr);const sameMonth=exp.getMonth()===today.getMonth()&&exp.getFullYear()===today.getFullYear();if(sameMonth){const brgys=barangaySchedules.filter(s=>s.vaccine===v.name&&new Date(s.date).getMonth()===today.getMonth()).map(s=>s.brgy);const item=document.createElement("div");item.className="notif-item";item.innerHTML=`<strong>${v.name}</strong> → Qty: ${v.quantity}, Exp: ${v.expiry}<br>Scheduled Barangays: ${brgys.length?brgys.join(", "):"None this month"}`;notif.appendChild(item);notif.style.display="block";}});}
+    function editVaccine(i){const v=vaccineInventory[i];const n=prompt("New name:",v.name);if(n) v.name=n;const q=prompt("New quantity:",v.quantity);if(q&&!isNaN(parseInt(q))) v.quantity=parseInt(q);const e=prompt("New expiry (YYYY-MM-DD):",v.expiry);if(e) v.expiry=e;saveInventory();renderInventory();}
+    function deleteVaccine(i){if(confirm("Delete vaccine?")){vaccineInventory.splice(i,1);saveInventory();renderInventory();}}
+
+    // ===== DOWNLOAD =====
+    document.getElementById("downloadData").addEventListener("click",()=>{const table=document.getElementById("mhoTable");const wb=XLSX.utils.book_new();const ws=XLSX.utils.table_to_sheet(table);XLSX.utils.book_append_sheet(wb,ws,"Children Records");XLSX.writeFile(wb,"children_records.xlsx");});
+  </script>
+</body>
+</html>

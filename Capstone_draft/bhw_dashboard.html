@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BHW Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.table-container th, .table-container td { 
+  padding: 6px 8px; font-size: 13px; text-align: left; border-bottom: 1px solid #ddd; 
+}
+.vaccine-btn { 
+  padding: 2px 6px; font-size: 12px; border-radius: 4px; cursor: pointer; border: none; 
+}
+.vaccine-btn.needed { background-color: #f39c12; color: white; }
+.vaccine-btn.accepted { background-color: #90ee90; color: black; }
+.new-child { background-color: #d0e7ff; } /* highlight for new children */
+</style>
+</head>
+<body>
+<header class="navbar">
+  <a href="bhw_dashboard.html" class="brand">
+    <img src="assets/logo.png" alt="Logo">
+    <span class="brand-name">HealthPro</span>
+  </a>
+  <nav>
+      <input type="text" id="searchName" placeholder="Search Name..." style="padding:5px; margin-left:10px;">
+      <button class="btn" onclick="searchByName()">Search</button>
+      <button class="btn" onclick="renderTable()">Reset</button>
+    <a href="login.html" class="btn danger">Logout</a>
+  </nav>
+</header>
+
+<main class="container">
+  <div class="dashboard-header">
+    <h2>BHW Dashboard</h2>
+  </div>
+
+  <div class="mt-4" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <input type="file" id="fileInput" class="input" accept=".csv,.xlsx,.xls" style="display:none;">
+      <button class="btn" onclick="document.getElementById('fileInput').click()">Upload File</button>
+    </div>
+
+    <div>
+      <button class="btn" onclick="addNewChild()">+ Add Child</button>
+      <button class="btn" id="editTableBtn" onclick="editTable()">Edit Table</button>
+      <button class="btn" onclick="deleteSelected()">Delete Selected</button>
+      <button class="btn" onclick="saveTableEdits()">Save Changes</button>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table class="table" id="childrenTable">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+          <th>Name</th><th>Age in Months</th><th>Date of Birth</th><th>Name of Parent</th><th>Barangay</th><th>Sector</th>
+          <th>BCG</th><th>HEPA B</th><th>PENTA 1</th><th>PENTA 2</th><th>PENTA 3</th>
+          <th>OPV1</th><th>OPV2</th><th>OPV3</th><th>IPV1</th><th>IPV2</th>
+          <th>PCV1</th><th>PCV2</th><th>PCV3</th><th>MCV1</th><th>MCV2</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="mt-4">
+    <label for="reportType">Download as:</label>
+    <select id="reportType" class="input mt-2">
+      <option value="csv">CSV</option>
+      <option value="xlsx">Excel (.xlsx)</option>
+    </select>
+    <button class="btn mt-3" onclick="downloadReport()">Download Report</button>
+  </div>
+</main>
+
+<script>
+// Get logged-in BHW's barangay and sector
+const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+const bhwBarangay = loggedInUser.barangay;
+const bhwSector = loggedInUser.sector;
+const bhwEmail = loggedInUser.email; // Get BHW's email
+
+// Use a specific key for children data based on BHW's barangay and sector
+const childrenDataKey = `hp_children_${bhwBarangay}__${bhwSector}`;
+let childrenData = JSON.parse(localStorage.getItem(childrenDataKey) || "[]");
+
+let isEditing = false;
+renderTable();
+
+document.getElementById('fileInput').addEventListener('change', handleFile);
+
+function normalizeVaccineValue(value){
+  if(!value) return "Needed";
+  value = value.toString().toLowerCase();
+  return value === "accepted" ? "Accepted" : "Needed";
+}
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+
+  reader.onload = e => {
+    let data;
+    if(file.name.toLowerCase().endsWith(".csv")){
+      data = parseCSV(e.target.result);
+    } else {
+      const array = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(array,{type:'array'});
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      data = XLSX.utils.sheet_to_json(worksheet,{defval:""});
+    }
+
+    data.forEach(row => {
+      for(const key of Object.keys(row)){
+        if(["bcg","hepa b","penta 1","penta 2","penta 3","opv1","opv2","opv3","ipv1","ipv2","pcv1","pcv2","pcv3","mcv1","mcv2"].includes(key.toLowerCase())){
+          row[key] = normalizeVaccineValue(row[key]);
+        }
+      }
+      // Assign current BHW's barangay, sector, and email to imported children
+      row["Barangay"] = bhwBarangay;
+      row["Sector"] = bhwSector;
+      row["bhwEmail"] = bhwEmail; 
+    });
+
+    childrenData = data;
+    saveAndRender();
+  };
+
+  if(file.name.toLowerCase().endsWith(".csv")) reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+function parseCSV(text){
+  const lines=text.trim().split("\n");
+  const headers=lines[0].split(",").map(h=>h.trim());
+  return lines.slice(1).map(line=>{
+    const values=line.split(",");
+    return headers.reduce((obj, header,i)=>{
+      obj[header]=values[i]?values[i].trim():"";
+      return obj;
+    },{});
+  });
+}
+
+function renderVaccineCell(name,row){
+  const value = normalizeVaccineValue(row[name]);
+  const cls = value==="Accepted"?"accepted":"needed";
+  return `<td><button class="vaccine-btn ${cls}" ${isEditing ? "" : "disabled"} onclick="toggleVaccine(this)">${value}</button></td>`;
+}
+
+function renderTable(filteredData){
+  const tbody = document.querySelector("#childrenTable tbody");
+  tbody.innerHTML="";
+  const data = filteredData || childrenData;
+  data.forEach((row,index)=>{
+    const tr=document.createElement("tr");
+    tr.dataset.index=index;
+    if(row.newChild) tr.classList.add("new-child"); 
+    tr.innerHTML=`
+      <td><input type="checkbox" class="select-row"></td>
+      <td contenteditable="${isEditing}">${row["Name"]||""}</td>
+      <td contenteditable="${isEditing}">${row["Age in Months"]||""}</td>
+      <td contenteditable="${isEditing}">${row["Date of Birth"]||""}</td>
+      <td contenteditable="${isEditing}">${row["Name of Parent"]||""}</td>
+      <td contenteditable="${isEditing}">${row["Barangay"]||""}</td>
+      <td contenteditable="${isEditing}">${row["Sector"]||""}</td>
+      ${renderVaccineCell("BCG", row)}
+      ${renderVaccineCell("HEPA B", row)}
+      ${renderVaccineCell("PENTA 1", row)}
+      ${renderVaccineCell("PENTA 2", row)}
+      ${renderVaccineCell("PENTA 3", row)}
+      ${renderVaccineCell("OPV1", row)}
+      ${renderVaccineCell("OPV2", row)}
+      ${renderVaccineCell("OPV3", row)}
+      ${renderVaccineCell("IPV1", row)}
+      ${renderVaccineCell("IPV2", row)}
+      ${renderVaccineCell("PCV1", row)}
+      ${renderVaccineCell("PCV2", row)}
+      ${renderVaccineCell("PCV3", row)}
+      ${renderVaccineCell("MCV1", row)}
+      ${renderVaccineCell("MCV2", row)}
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function addNewChild(){
+  const newChild={
+    "Name":"","Age in Months":"","Date of Birth":"","Name of Parent":"",
+    "Barangay": bhwBarangay, // Auto-fill barangay
+    "Sector": bhwSector,     // Auto-fill sector
+    "bhwEmail": bhwEmail,    // Auto-fill BHW email
+    "BCG":"Needed","HEPA B":"Needed","PENTA 1":"Needed","PENTA 2":"Needed","PENTA 3":"Needed",
+    "OPV1":"Needed","OPV2":"Needed","OPV3":"Needed","IPV1":"Needed","IPV2":"Needed",
+    "PCV1":"Needed","PCV2":"Needed","PCV3":"Needed","MCV1":"Needed","MCV2":"Needed",
+    "newChild": true
+  };
+  childrenData.unshift(newChild);
+  saveAndRender();
+}
+
+function editTable(){
+  isEditing = true;
+  const btn = document.getElementById("editTableBtn");
+  btn.style.backgroundColor = "#28a745"; // green
+  btn.style.color = "white";
+  renderTable();
+}
+
+function toggleVaccine(btn){
+  if(btn.disabled) return;
+  if(btn.innerText==="Needed"){
+    btn.innerText="Accepted";
+    btn.classList.remove("needed");
+    btn.classList.add("accepted");
+  } else {
+    btn.innerText="Needed";
+    btn.classList.remove("accepted");
+    btn.classList.add("needed");
+  }
+}
+
+function saveTableEdits(){
+  const tbody=document.querySelector("#childrenTable tbody");
+  const rows=tbody.querySelectorAll("tr");
+  childrenData=Array.from(rows).map(tr=>{
+    const cells=tr.querySelectorAll("td");
+    const child = {
+      "Name":cells[1].innerText.trim(),
+      "Age in Months":cells[2].innerText.trim(),
+      "Date of Birth":cells[3].innerText.trim(),
+      "Name of Parent":cells[4].innerText.trim(),
+      "Barangay":cells[5].innerText.trim(),
+      "Sector":cells[6].innerText.trim(),
+      "BCG":cells[7].querySelector("button")?.innerText.trim()||"Needed",
+      "HEPA B":cells[8].querySelector("button")?.innerText.trim()||"Needed",
+      "PENTA 1":cells[9].querySelector("button")?.innerText.trim()||"Needed",
+      "PENTA 2":cells[10].querySelector("button")?.innerText.trim()||"Needed",
+      "PENTA 3":cells[11].querySelector("button")?.innerText.trim()||"Needed",
+      "OPV1":cells[12].querySelector("button")?.innerText.trim()||"Needed",
+      "OPV2":cells[13].querySelector("button")?.innerText.trim()||"Needed",
+      "OPV3":cells[14].querySelector("button")?.innerText.trim()||"Needed",
+      "IPV1":cells[15].querySelector("button")?.innerText.trim()||"Needed",
+      "IPV2":cells[16].querySelector("button")?.innerText.trim()||"Needed",
+      "PCV1":cells[17].querySelector("button")?.innerText.trim()||"Needed",
+      "PCV2":cells[18].querySelector("button")?.innerText.trim()||"Needed",
+      "PCV3":cells[19].querySelector("button")?.innerText.trim()||"Needed",
+      "MCV1":cells[20].querySelector("button")?.innerText.trim()||"Needed",
+      "MCV2":cells[21].querySelector("button")?.innerText.trim()||"Needed",
+      "bhwEmail": bhwEmail // Ensure BHW email is saved with the child record
+    };
+    if(tr.classList.contains("new-child")) tr.classList.remove("new-child");
+    return child;
+  });
+  isEditing = false;
+  const btn = document.getElementById("editTableBtn");
+  btn.style.backgroundColor = ""; // reset color
+  btn.style.color = "";
+  saveAndRender();
+  alert("Changes saved!");
+}
+
+function deleteSelected(){
+  const selectedIndexes=[];
+  document.querySelectorAll("#childrenTable tbody tr").forEach((tr,index)=>{
+    if(tr.querySelector(".select-row").checked) selectedIndexes.push(index);
+  });
+  if(selectedIndexes.length===0){ alert("No children selected!"); return; }
+  if(confirm(`Are you sure you want to delete ${selectedIndexes.length} child(ren)?`)){
+    selectedIndexes.sort((a,b)=>b-a).forEach(i=>childrenData.splice(i,1));
+    saveAndRender();
+  }
+}
+
+function searchByName(){
+  const term=document.getElementById("searchName").value.toLowerCase().trim();
+  if(!term){ renderTable(); return; }
+  const filtered=childrenData.filter(c=> (c["Name"]||"").toLowerCase().includes(term));
+  renderTable(filtered);
+}
+
+function saveAndRender(){
+  localStorage.setItem(childrenDataKey,JSON.stringify(childrenData));
+  renderTable();
+}
+
+function downloadReport(){
+  if(childrenData.length===0){alert("No data to download!");return;}
+  const type=document.getElementById("reportType").value;
+  if(type==="csv"){
+    // Include bhwEmail in CSV export
+    let csv=Object.keys(childrenData[0]).join(",")+"\n";
+    childrenData.forEach(row=>csv+=Object.values(row).join(",")+"\n");
+    const blob=new Blob([csv],{type:"text/csv"});
+    const link=document.createElement("a");
+    link.href=URL.createObjectURL(blob);
+    link.download="children_report.csv";
+    link.click();
+  } else {
+    const ws=XLSX.utils.json_to_sheet(childrenData);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Report");
+    XLSX.writeFile(wb,"children_report.xlsx");
+  }
+}
+
+function toggleSelectAll(checkbox){
+  document.querySelectorAll(".select-row").forEach(cb=>cb.checked=checkbox.checked);
+}
+</script>
+</body>
+</html>
