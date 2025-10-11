@@ -1,0 +1,14 @@
+{
+  "name": "capstone-firebase-setup",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "seed": "node scripts/seed.js --project $FIREBASE_PROJECT --key $GOOGLE_APPLICATION_CREDENTIALS",
+    "emulators": "firebase emulators:start --only firestore --project $FIREBASE_PROJECT --import=./firebase/data --export-on-exit"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  },
+  "devDependencies": {
+  }
+}
