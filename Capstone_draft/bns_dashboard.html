@@ -1,236 +1,609 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>BNS Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="stylesheet" href="css/style.css" />
-<style>
-  .table-container th, .table-container td { padding:6px 8px; font-size:13px; border-bottom:1px solid #ddd; }
-  .vaccine-btn { padding:2px 6px; font-size:12px; border-radius:4px; border:none; cursor:default; }
-  .vaccine-btn.accepted { background-color:#90ee90; color:black; }
-  .vaccine-btn.needed { background-color:#f39c12; color:white; }
-  .tab-btn { cursor:pointer; margin-right:10px; padding:5px 10px; }
-  .tab-btn.active { background-color:#007bff; color:white; }
-  .tab-content { display:none; margin-top:20px; }
-  .tab-content.active { display:block; }
-</style>
+  <meta charset="UTF-8" />
+  <title>BNS Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Tailwind CSS via CDN for rapid, modern UI -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"/>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#90EE90",
+            secondary: "#43A047",
+            accent: "#A5D6A7",
+            "background-light": "#F9FAFB",
+            "background-dark": "#1F2937",
+            "text-light": "#1B5E20",
+            "text-dark": "#F9FAFB",
+          },
+          fontFamily: {
+            display: ["Roboto", "sans-serif"],
+            body: ["Lato", "sans-serif"],
+          },
+          borderRadius: { DEFAULT: "0.5rem", lg: "0.75rem", xl: "1rem", full: "9999px" },
+        },
+      },
+    };
+  </script>
+
+  <!-- Project styles (tables, basic layout) -->
+  <link rel="stylesheet" href="css/style.css" />
+
+  <style>
+    nav button.active { text-decoration: underline; }
+    .tab-btn { cursor:pointer; margin-right:10px; padding:5px 10px; }
+    .tab-btn.active { text-decoration: underline; }
+    .tab-content { display:none; margin-top:20px; }
+    .tab-content.active { display:block; }
+
+    /* Dropdown menu for download */
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown-content { display:none; position:absolute; background-color:#fff; min-width:140px; box-shadow:0 2px 6px rgba(0,0,0,.2); z-index:10; border-radius:6px; overflow:hidden; }
+    .dropdown-content button { width:100%; padding:8px 12px; border:none; background:none; text-align:left; cursor:pointer; font-size:14px; }
+    .dropdown-content button:hover { background:#007bff; color:#fff; }
+    .show { display:block; }
+
+    .badge.vaccinated { background-color:#22c55e; color:#fff; padding:2px 6px; border-radius:3px; font-size:12px; }
+    .badge.not-vaccinated { background-color:#fbbf24; color:#000; padding:2px 6px; border-radius:3px; font-size:12px; }
+
+    /* Modals */
+    .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color: rgba(0,0,0,0.5); }
+    .modal-content { background:#fff; margin:15% auto; padding:20px; border:1px solid #888; width:90%; max-width:420px; text-align:center; border-radius:8px; }
+  </style>
 </head>
-<body>
+<body class="bg-background-light dark:bg-background-dark font-body text-text-light dark:text-text-dark">
 
-<header class="navbar">
-  <a class="brand" href="bns_dashboard.html">
-    <img src="assets/logo.png" alt="Logo" class="logo" />
-    <span class="brand-name">BNS</span>
-  </a>
-  <nav>
-    <a href="login.html" class="btn danger">Logout</a>
-  </nav>
-</header>
-
-<main class="container">
-  <h2>BNS Dashboard</h2>
-  <p>Barangay: <strong id="bnsBarangay"></strong> (All Sectors)</p>
-
-  <div>
-    <button class="tab-btn active" onclick="openTab('childrenTab', this)">Children Records</button>
-    <button class="tab-btn" onclick="openTab('profileTab', this)">BHW Profiles</button>
-  </div>
-
-  <!-- Children Records Tab -->
-  <div id="childrenTab" class="tab-content active">
-    <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
-      <label for="bhwFilter">Filter by BHW:</label>
-      <select id="bhwFilter" onchange="filterByBHW()">
-        <option value="all">All BHWs</option>
-      </select>
-
-      <label for="reportType">Download as:</label>
-      <select id="reportType">
-        <option value="csv">CSV</option>
-        <option value="xlsx">Excel (.xlsx)</option>
-      </select>
-      <button class="btn" onclick="downloadReport()">Download Report</button>
+  <!-- Top bar -->
+  <header class="flex items-center justify-between whitespace-nowrap bg-primary px-6 py-4 shadow-md sticky top-0 z-50">
+    <div class="flex items-center gap-2 sm:gap-4 text-text-light dark:text-text-dark">
+      <span class="material-symbols-outlined text-3xl sm:text-4xl text-secondary">health_and_safety</span>
+      <h2 class="text-xl sm:text-2xl font-bold leading-tight tracking-[-0.015em] font-display">BNS Dashboard</h2>
     </div>
+    <nav class="flex items-center gap-4">
+      <button class="text-lg font-medium leading-normal hover:text-secondary transition-colors active" onclick="openTab('homeTab', this)">Home</button>
+      <button class="text-lg font-medium leading-normal hover:text-secondary transition-colors" onclick="openTab('childrenTab', this)">Children Records</button>
+      <button class="text-lg font-medium leading-normal hover:text-secondary transition-colors" onclick="openTab('profileTab', this)">Profiles</button>
+      <button onclick="logout()" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 sm:h-12 sm:px-6 bg-secondary text-white text-sm sm:text-base font-bold leading-normal tracking-[0.015em] hover:opacity-90 transition-opacity">
+        <span class="truncate">Logout</span>
+      </button>
+    </nav>
+  </header>
 
-    <div class="table-container" style="overflow-x:auto; margin-top:10px;">
-      <table class="table" id="childrenTable">
-        <thead>
-          <tr>
-            <th>Child Name</th>
-            <th>Age in months</th>
-            <th>Parent Name</th>
-            <th>Barangay</th>
-            <th>Sector</th>
-            <th>BCG</th><th>HEPA B</th><th>PENTA 1</th><th>PENTA 2</th><th>PENTA 3</th>
-            <th>OPV1</th><th>OPV2</th><th>OPV3</th><th>IPV1</th><th>IPV2</th>
-            <th>PCV1</th><th>PCV2</th><th>PCV3</th><th>MCV1</th><th>MCV2</th>
-            <th>BHW Email</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
+  <main class="container max-w-full mx-auto px-6 sm:px-10 py-10">
+    <h2 class="sr-only">BNS Dashboard</h2>
+    <p class="mb-4">Barangay: <strong id="bnsBarangay"></strong></p>
 
-  <!-- BHW Profiles Tab -->
-  <div id="profileTab" class="tab-content">
-    <div class="table-container" style="overflow-x:auto;">
-      <table class="table" id="profileTable">
-        <thead>
-          <tr>
-            <th>Name</th><th>Email</th><th>Barangay</th><th>Sector</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
-</main>
+    <!-- Home Tab -->
+    <section id="homeTab" class="tab-content active">
+      <!-- Hero -->
+      <div class="relative overflow-hidden rounded-xl bg-gradient-to-b from-secondary/80 to-secondary/30 h-48 sm:h-56 mb-8">
+        <div class="absolute inset-0 bg-[url('assets/logo_big.png')] bg-no-repeat bg-right-bottom opacity-10"></div>
+        <div class="h-full w-full flex items-center px-6 sm:px-10">
+          <div>
+            <h1 class="text-2xl sm:text-4xl font-display font-extrabold text-white drop-shadow-sm">Barangay Nutrition Scholar</h1>
+            <p class="text-white/95 text-sm sm:text-base mt-1">Protecting our future, one child at a time.</p>
+          </div>
+        </div>
+      </div>
 
-<footer class="footer">
-  <div class="container"><small>&copy; <span id="y"></span> HealthPro</small></div>
-</footer>
+      <!-- Mission & Snapshot -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-xl font-semibold mb-2">Mission & Vision</h3>
+            <p class="text-gray-700 dark:text-gray-200">Our mission is to ensure every child has access to timely immunization and nutrition support. Our vision is a healthier community where preventable diseases are eliminated through effective community-driven programs.</p>
+          </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script>
-document.getElementById('y').textContent = new Date().getFullYear();
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-xl font-semibold mb-4">Our Programs</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <h4 class="font-medium">Child Immunization</h4>
+                <p class="text-sm text-gray-600">Complete vaccination services for infants and children.</p>
+              </div>
+              <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <h4 class="font-medium">Maternal Care</h4>
+                <p class="text-sm text-gray-600">Pre- and post-natal care to ensure healthy outcomes.</p>
+              </div>
+              <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <h4 class="font-medium">Community Health</h4>
+                <p class="text-sm text-gray-600">Health awareness and education across all barangays.</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-// Logged-in BNS info
-const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
-document.getElementById("bnsBarangay").textContent = loggedInUser.barangay || "All";
+        <aside class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+          <h3 class="text-xl font-semibold mb-2">Daily Health Snapshot</h3>
+          <dl class="divide-y divide-gray-100 dark:divide-gray-700">
+            <div class="flex items-center justify-between py-2"><dt class="text-gray-600">Today's Date</dt><dd id="todayDate" class="font-medium">—</dd></div>
+            <div class="flex items-center justify-between py-2"><dt class="text-gray-600">Weather</dt><dd id="weatherText" class="font-medium">32°C, Sunny</dd></div>
+            <div class="flex items-center justify-between py-2"><dt class="text-gray-600">Scheduled Visits</dt><dd id="scheduledVisits" class="font-medium">Loading…</dd></div>
+            <div class="flex items-center justify-between py-2"><dt class="text-gray-600">Children for Vaccination</dt><dd class="font-bold text-secondary"><span id="childrenNeeding">0</span></dd></div>
+          </dl>
+        </aside>
+      </div>
 
-// Load children and BHW profiles
-// Children data is stored per barangay and sector, so we need to aggregate it for BNS
-let childrenData = [];
-const bhwBnsProfiles = JSON.parse(localStorage.getItem("bhwBnsProfiles") || "[]");
-const bhwsInBNSBarangay = bhwBnsProfiles.filter(p => p.role === "BHW" && p.barangay === loggedInUser.barangay);
+      <!-- Quick stats -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"><h4 class="text-lg font-medium mb-2">Total Children</h4><p id="totalChildren" class="text-3xl font-bold text-secondary">0</p></div>
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"><h4 class="text-lg font-medium mb-2">Total BHWs</h4><p id="totalBHWs" class="text-3xl font-bold text-secondary">0</p></div>
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"><h4 class="text-lg font-medium mb-2">Your Barangay</h4><p id="homeBarangay" class="text-xl font-semibold">Loading…</p></div>
+      </div>
+    </section>
 
-bhwsInBNSBarangay.forEach(bhw => {
-    const key = `hp_children_${bhw.barangay}__${bhw.sector}`;
-    const bhwChildren = JSON.parse(localStorage.getItem(key) || "[]");
-    childrenData = childrenData.concat(bhwChildren);
-});
+    <!-- Children Records Tab -->
+    <section id="childrenTab" class="tab-content">
+      <div class="mt-2 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <!-- Download dropdown -->
+        <div class="dropdown">
+          <button class="btn bg-white border border-gray-300 rounded-md px-4 py-2" onclick="toggleDropdown()">Download Report</button>
+          <div id="downloadMenu" class="dropdown-content">
+            <button class="w-full text-left px-4 py-2 text-sm" onclick="downloadReport('csv')">CSV</button>
+            <button class="w-full text-left px-4 py-2 text-sm" onclick="downloadReport('xlsx')">Excel (.xlsx)</button>
+            <button class="w-full text-left px-4 py-2 text-sm" onclick="downloadReport('pdf')">PDF</button>
+          </div>
+        </div>
 
-// Filter BHW profiles for the current BNS's barangay
-const bhwProfiles = bhwBnsProfiles.filter(p => p.role === "BHW" && p.barangay === loggedInUser.barangay);
+        <!-- Filter dropdown -->
+        <div class="relative inline-block">
+          <button class="btn bg-white border border-gray-300 rounded-md px-4 py-2" onclick="toggleFilterDropdown()">Filter ▼</button>
+          <div class="filter-bar" id="filterBar" style="display:none; position: absolute; right: 0; z-index: 20;">
+            <div class="bg-white shadow-md p-4 rounded-lg mt-2 relative">
+              <button onclick="toggleFilterDropdown()" class="absolute top-2 right-3 text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
+              <div class="flex gap-6 items-start">
+                <div>
+                  <h4 class="font-medium text-sm mb-2 border-b">BHW</h4>
+                  <div id="bhwFilterContainer" class="space-y-1 max-h-80 overflow-y-auto pr-2"></div>
+                </div>
+                <div>
+                  <h4 class="font-medium text-sm mb-2 border-b">Year</h4>
+                  <div id="yearFilterContainer" class="space-y-1 max-h-80 overflow-y-auto pr-2"></div>
+                </div>
+                <div>
+                  <h4 class="font-medium text-sm mb-2 border-b">Month</h4>
+                  <div id="monthFilterContainer" class="space-y-1 max-h-80 overflow-y-auto pr-2"></div>
+                </div>
+              </div>
+              <div class="flex gap-3 items-center mt-4">
+                <button onclick="applyFilter()" class="bg-secondary text-white px-3 py-1 text-sm rounded-md hover:opacity-90 transition">Apply</button>
+                <button onclick="clearFilter()" class="bg-gray-500 text-white px-3 py-1 text-sm rounded-md hover:bg-gray-600 transition">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="filterInfo" class="text-sm text-gray-600 mt-2" style="display:none;"></div>
 
-// Filter children for BNS barangay (initially all children from the BNS's barangay)
-let filteredChildren = childrenData;
+      <div class="table-container" style="overflow-x:auto; margin-top:10px;">
+        <table class="table" id="childrenTable">
+          <thead>
+            <tr>
+              <th>Name of Children</th>
+              <th>Age in months</th>
+              <th>Parent Name</th>
+              <th>Barangay</th>
+              <th>Sector</th>
+              <th>Report Date</th>
+              <th>BCG (At Birth)</th><th>HEPA B (At Birth)</th><th>PENTA 1 (1 1/2 mos.)</th><th>PENTA 2 (1 1/2 mos.)</th><th>PENTA 3 (1 1/2 mos.)</th>
+              <th>OPV1 (1 1/2 mos.)</th><th>OPV2 (2 1/2 mos.)</th><th>OPV3 (3 1/2 mos.)</th><th>IPV1 (3 1/2 mos.)</th><th>IPV2 (9 mos.)</th>
+              <th>PCV1 (1 1/2 mos.)</th><th>PCV2 (2 1/2 mos.)</th><th>PCV3 (3 1/2 mos.)</th><th>MCV1 (9 mos.)</th><th>MCV2 (12 mos. & 29 days)</th>
+              <th>BHW Email</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
 
-// Populate BHW dropdown
-function populateBHWFilter() {
-  const bhwFilter = document.getElementById("bhwFilter");
-  // Clear existing options except "All BHWs"
-  bhwFilter.innerHTML = '<option value="all">All BHWs</option>';
-  
-  bhwProfiles.forEach(b => {
-    const option = document.createElement("option");
-    option.value = b.email;
-    option.textContent = b.name + " (" + b.email + ")";
-    bhwFilter.appendChild(option);
-  });
-}
+    <!-- Profiles Tab -->
+    <section id="profileTab" class="tab-content">
+      <!-- BNS User Profile Section -->
+      <div class="bns-profile-section mb-8 p-6 bg-gray-50 rounded-lg">
+        <h3 class="text-lg font-semibold mb-4">Your Profile (BNS)</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <p><strong>Name:</strong> <span id="bnsName">Loading…</span></p>
+          <p><strong>Email:</strong> <span id="bnsEmail">Loading…</span></p>
+          <p><strong>Barangay:</strong> <span id="bnsBarangayProfile">Loading…</span></p>
+          <p><strong>Sector:</strong> <span id="bnsSector">Loading…</span></p>
+        </div>
+      </div>
 
-// Filter children by selected BHW
-function filterByBHW() {
-  const selected = document.getElementById("bhwFilter").value;
-  if(selected === "all") filteredChildren = childrenData; // Show all children from the BNS's barangay
-  else filteredChildren = childrenData.filter(c => c.bhwEmail === selected);
-  renderChildrenTable();
-}
+      <h3 class="text-lg font-semibold mb-4">BHW Profiles</h3>
+      <div class="table-container" style="overflow-x:auto;">
+        <table class="table" id="profileTable">
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Barangay</th><th>Sector</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 
-// Render children table
-function renderChildrenTable() {
-  const tbody = document.querySelector("#childrenTable tbody");
-  tbody.innerHTML = "";
-  filteredChildren.forEach(c => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${c.Name || ""}</td>
-      <td>${c["Age in Months"] || ""}</td>
-      <td>${c["Name of Parent"] || ""}</td>
-      <td>${c.Barangay || ""}</td>
-      <td>${c.Sector || ""}</td>
-      <td><button class="vaccine-btn ${c.BCG==="Accepted"?"accepted":"needed"}" disabled>${c.BCG}</button></td>
-      <td><button class="vaccine-btn ${c["HEPA B"]==="Accepted"?"accepted":"needed"}" disabled>${c["HEPA B"]}</button></td>
-      <td><button class="vaccine-btn ${c["PENTA 1"]==="Accepted"?"accepted":"needed"}" disabled>${c["PENTA 1"]}</button></td>
-      <td><button class="vaccine-btn ${c["PENTA 2"]==="Accepted"?"accepted":"needed"}" disabled>${c["PENTA 2"]}</button></td>
-      <td><button class="vaccine-btn ${c["PENTA 3"]==="Accepted"?"accepted":"needed"}" disabled>${c["PENTA 3"]}</button></td>
-      <td><button class="vaccine-btn ${c["OPV1"]==="Accepted"?"accepted":"needed"}" disabled>${c["OPV1"]}</button></td>
-      <td><button class="vaccine-btn ${c["OPV2"]==="Accepted"?"accepted":"needed"}" disabled>${c["OPV2"]}</button></td>
-      <td><button class="vaccine-btn ${c["OPV3"]==="Accepted"?"accepted":"needed"}" disabled>${c["OPV3"]}</button></td>
-      <td><button class="vaccine-btn ${c["IPV1"]==="Accepted"?"accepted":"needed"}" disabled>${c["IPV1"]}</button></td>
-      <td><button class="vaccine-btn ${c["IPV2"]==="Accepted"?"accepted":"needed"}" disabled>${c["IPV2"]}</button></td>
-      <td><button class="vaccine-btn ${c["PCV1"]==="Accepted"?"accepted":"needed"}" disabled>${c["PCV1"]}</button></td>
-      <td><button class="vaccine-btn ${c["PCV2"]==="Accepted"?"accepted":"needed"}" disabled>${c["PCV2"]}</button></td>
-      <td><button class="vaccine-btn ${c["PCV3"]==="Accepted"?"accepted":"needed"}" disabled>${c["PCV3"]}</button></td>
-      <td><button class="vaccine-btn ${c["MCV1"]==="Accepted"?"accepted":"needed"}" disabled>${c["MCV1"]}</button></td>
-      <td><button class="vaccine-btn ${c["MCV2"]==="Accepted"?"accepted":"needed"}" disabled>${c["MCV2"]}</button></td>
-      <td>${c.bhwEmail || ""}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
+  <!-- External libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
-// Render BHW profiles table
-function renderProfileTable() {
-  const tbody = document.querySelector("#profileTable tbody");
-  tbody.innerHTML = "";
-  bhwProfiles.forEach(b => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${b.name}</td><td>${b.email}</td><td>${b.barangay}</td><td>${b.sector}</td>`;
-    tbody.appendChild(tr);
-  });
-}
+  <script>
+    // ===== Utilities =====
+    const MONTHS = [
+      { v: "01", l: "January" }, { v: "02", l: "February" }, { v: "03", l: "March" }, { v: "04", l: "April" },
+      { v: "05", l: "May" }, { v: "06", l: "June" }, { v: "07", l: "July" }, { v: "08", l: "August" },
+      { v: "09", l: "September" }, { v: "10", l: "October" }, { v: "11", l: "November" }, { v: "12", l: "December" }
+    ];
+    const YEARS = [2020,2021,2022,2023,2024,2025];
 
-// Tab switcher
-function openTab(tabId, btn) {
-  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
-  document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
-  document.getElementById(tabId).classList.add("active");
-  btn.classList.add("active");
-}
+    const LS = { role: "hp_role", email: "hp_email", barangay: "hp_barangay", sector: "hp_sector" };
+    const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+    document.getElementById("bnsBarangay").textContent = loggedInUser.barangay || "All";
 
-// Download report
-function downloadReport(){
-  if(filteredChildren.length===0){ alert("No data!"); return; }
-  const type = document.getElementById("reportType").value;
-  if(type==="csv"){
-    // Ensure all keys are included for CSV header, even if some rows don't have them
-    const allKeys = new Set();
-    filteredChildren.forEach(row => Object.keys(row).forEach(key => allKeys.add(key)));
-    const headers = Array.from(allKeys);
+    // ===== Data aggregation & normalization =====
+    function isVaccinatedStatus(value){
+      if (value === undefined || value === null) return false;
+      const s = String(value).trim().toLowerCase();
+      return ["accepted","vaccinated","complete","completed","done","yes","y","true","1"].includes(s);
+    }
 
-    let csv = headers.join(",") + "\n";
-    filteredChildren.forEach(row => {
-        const values = headers.map(header => {
-            const val = row[header];
-            // Handle values that might contain commas or quotes
-            if (val === undefined || val === null) return "";
-            const s = String(val);
-            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-        });
-        csv += values.join(",") + "\n";
+    function toMMYYYYFromDOB(dob){
+      if(!dob || typeof dob !== 'string' || !dob.includes('/')) return '';
+      const parts = dob.split('/');
+      if(parts.length !== 3) return '';
+      return parts[0].padStart(2,'0') + '/' + parts[2];
+    }
+
+    const labelMap = new Map([
+      ["BCG (At Birth)", "BCG"],
+      ["HEPA B (At Birth)", "HEPA B"],
+      ["PENTA 1 (1 1/2 mos.)", "PENTA 1"],
+      ["PENTA 2 (1 1/2 mos.)", "PENTA 2"],
+      ["PENTA 3 (1 1/2 mos.)", "PENTA 3"],
+      ["OPV1 (1 1/2 mos.)", "OPV1"],
+      ["OPV2 (2 1/2 mos.)", "OPV2"],
+      ["OPV3 (3 1/2 mos.)", "OPV3"],
+      ["IPV1 (3 1/2 mos.)", "IPV1"],
+      ["IPV2 (9 mos.)", "IPV2"],
+      ["PCV1 (1 1/2 mos.)", "PCV1"],
+      ["PCV2 (2 1/2 mos.)", "PCV2"],
+      ["PCV3 (3 1/2 mos.)", "PCV3"],
+      ["MCV1 (9 mos.)", "MCV1"],
+      ["MCV2 (12 mos. & 29 days)", "MCV2"],
+    ]);
+
+    function normalizeChild(bhw, child){
+      const unified = {
+        "Name of Children": child["Name of Children"] || child["Name"] || child["Child Name"] || "",
+        "Age in Months": child["Age in Months"] || child["Age in months"] || child["Age"] || "",
+        "Name of Parent": child["Name of Parent"] || child["Name of Mother"] || child["Parent Name"] || "",
+        "Barangay": child["Barangay"] || bhw.barangay || "",
+        "Sector": child["Sector"] || bhw.sector || "",
+        "Report Date": child["Report Date"] || toMMYYYYFromDOB(child["Date of Birth"]) || "",
+        "bhwEmail": child["bhwEmail"] || bhw.email || "",
+      };
+      labelMap.forEach((shortKey, longKey) => {
+        const raw = child[longKey] !== undefined ? child[longKey] : child[shortKey];
+        unified[longKey] = isVaccinatedStatus(raw) ? "Vaccinated" : (raw ? raw : "");
+      });
+      return unified;
+    }
+
+    // Load children and BHW profiles scoped to the BNS barangay
+    const allProfiles = JSON.parse(localStorage.getItem("bhwBnsProfiles") || "[]");
+    const bhwProfiles = allProfiles.filter(p => p.role === "BHW" && (!loggedInUser.barangay || p.barangay === loggedInUser.barangay));
+
+    let childrenData = [];
+    bhwProfiles.forEach(bhw => {
+      const key = `hp_children_${bhw.barangay}__${bhw.sector}`;
+      const bhwChildren = JSON.parse(localStorage.getItem(key) || "[]");
+      bhwChildren.forEach(ch => childrenData.push(normalizeChild(bhw, ch)));
     });
 
-    const blob = new Blob([csv],{type:"text/csv"});
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "children_report.csv";
-    link.click();
-  } else {
-    const ws = XLSX.utils.json_to_sheet(filteredChildren);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
-    XLSX.writeFile(wb,"children_report.xlsx");
-  }
-}
+    // Filtered view
+    let filteredChildren = childrenData.slice();
 
-// Initialize
-populateBHWFilter();
-renderChildrenTable();
-renderProfileTable();
-</script>
+    // ===== Filters UI =====
+    function setupFilterCheckboxes(containerId){
+      const container = document.getElementById(containerId);
+      const selectAll = container.querySelector('input[value="all"]');
+      const options = container.querySelectorAll('.filter-option');
+      selectAll.addEventListener('change', () => { options.forEach(opt => opt.checked = selectAll.checked); });
+    }
+
+    const bhwContainer = document.getElementById('bhwFilterContainer');
+    bhwContainer.innerHTML = `
+      <label class="flex items-center text-sm font-semibold">
+        <input type="checkbox" name="bhw" value="all" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary">
+        <span class="ml-2">Select All</span>
+      </label>
+    `;
+    bhwProfiles.forEach(b => {
+      bhwContainer.innerHTML += `
+        <label class="flex items-center text-sm">
+          <input type="checkbox" name="bhw" value="${b.email}" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary filter-option">
+          <span class="ml-2">${b.name} (${b.sector})</span>
+        </label>
+      `;
+    });
+
+    const yearContainer = document.getElementById('yearFilterContainer');
+    yearContainer.innerHTML = `
+      <label class="flex items-center text-sm font-semibold">
+        <input type="checkbox" name="year" value="all" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary">
+        <span class="ml-2">Select All</span>
+      </label>
+    `;
+    YEARS.forEach(y => { yearContainer.innerHTML += `
+      <label class="flex items-center text-sm">
+        <input type="checkbox" name="year" value="${y}" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary filter-option">
+        <span class="ml-2">${y}</span>
+      </label>`; });
+
+    const monthContainer = document.getElementById('monthFilterContainer');
+    monthContainer.innerHTML = `
+      <label class="flex items-center text-sm font-semibold">
+        <input type="checkbox" name="month" value="all" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary">
+        <span class="ml-2">Select All</span>
+      </label>
+    `;
+    MONTHS.forEach(m => { monthContainer.innerHTML += `
+      <label class="flex items-center text-sm">
+        <input type="checkbox" name="month" value="${m.v}" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary filter-option">
+        <span class="ml-2">${m.l}</span>
+      </label>`; });
+
+    // After DOM has default items
+    setupFilterCheckboxes('bhwFilterContainer');
+    setupFilterCheckboxes('yearFilterContainer');
+    setupFilterCheckboxes('monthFilterContainer');
+
+    function toggleFilterDropdown(){
+      const d = document.getElementById('filterBar');
+      d.style.display = d.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function formatReportDateForDisplay(reportDate){
+      if(!reportDate || !reportDate.includes('/')) return reportDate || '';
+      const [month, year] = reportDate.split('/');
+      const monthName = MONTHS.find(m => m.v === month)?.l || 'Unknown';
+      return `${monthName} ${year}`;
+    }
+
+    function applyFilter(){
+      const selectedBHWs = Array.from(document.querySelectorAll('#bhwFilterContainer input.filter-option:checked')).map(cb => cb.value);
+      const selectedYears = Array.from(document.querySelectorAll('#yearFilterContainer input.filter-option:checked')).map(cb => cb.value);
+      const selectedMonths = Array.from(document.querySelectorAll('#monthFilterContainer input.filter-option:checked')).map(cb => cb.value);
+
+      filteredChildren = childrenData.filter(child => {
+        const bhwMatch = selectedBHWs.length === 0 || selectedBHWs.includes(child.bhwEmail);
+        const hasYearFilter = selectedYears.length > 0;
+        const hasMonthFilter = selectedMonths.length > 0;
+        if(!hasYearFilter && !hasMonthFilter) return bhwMatch;
+
+        let dateMatches = false;
+        if (child["Report Date"] && child["Report Date"].includes('/')){
+          const [m, y] = child["Report Date"].split('/');
+          const yOk = !hasYearFilter || selectedYears.includes(y);
+          const mOk = !hasMonthFilter || selectedMonths.includes(m);
+          dateMatches = yOk && mOk;
+        } else if (child["Date of Birth"]) {
+          const fallback = toMMYYYYFromDOB(child["Date of Birth"]);
+          if (fallback){
+            const [m, y] = fallback.split('/');
+            const yOk = !hasYearFilter || selectedYears.includes(y);
+            const mOk = !hasMonthFilter || selectedMonths.includes(m);
+            dateMatches = yOk && mOk;
+          }
+        }
+        return bhwMatch && dateMatches;
+      });
+
+      renderChildrenTable();
+      updateFilterInfo(selectedBHWs, selectedYears, selectedMonths);
+      toggleFilterDropdown();
+    }
+
+    function updateFilterInfo(bhws, years, months){
+      const infoDiv = document.getElementById('filterInfo');
+      const bits = [];
+      if (bhws.length){
+        const names = bhws.map(email => bhwProfiles.find(p => p.email === email)?.name || email);
+        bits.push(`<strong>BHW:</strong> ${names.join(', ')}`);
+      }
+      if (years.length) bits.push(`<strong>Year:</strong> ${years.join(', ')}`);
+      if (months.length){
+        const monthNames = months.map(v => MONTHS.find(m => m.v === v)?.l || v);
+        bits.push(`<strong>Months:</strong> ${monthNames.join(', ')}`);
+      }
+      if (bits.length){ infoDiv.innerHTML = `Filtering by: ${bits.join('; ')}`; infoDiv.style.display = 'block'; }
+      else infoDiv.style.display = 'none';
+    }
+
+    function clearFilter(){
+      document.querySelectorAll('#filterBar input[type="checkbox"]').forEach(cb => cb.checked = false);
+      filteredChildren = childrenData.slice();
+      renderChildrenTable();
+      updateFilterInfo([],[],[]);
+      toggleFilterDropdown();
+    }
+
+    // ===== Rendering =====
+    function renderChildrenTable(){
+      const tbody = document.querySelector('#childrenTable tbody');
+      tbody.innerHTML = '';
+      filteredChildren.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${c["Name of Children"] || ''}</td>
+          <td>${c["Age in Months"] || ''}</td>
+          <td>${c["Name of Parent"] || ''}</td>
+          <td>${c.Barangay || ''}</td>
+          <td>${c.Sector || ''}</td>
+          <td>${formatReportDateForDisplay(c["Report Date"])}</td>
+          <td><span class="badge ${c["BCG (At Birth)"]? 'vaccinated':'not-vaccinated'}">${c["BCG (At Birth)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["HEPA B (At Birth)"]? 'vaccinated':'not-vaccinated'}">${c["HEPA B (At Birth)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["PENTA 1 (1 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["PENTA 1 (1 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["PENTA 2 (1 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["PENTA 2 (1 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["PENTA 3 (1 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["PENTA 3 (1 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["OPV1 (1 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["OPV1 (1 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["OPV2 (2 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["OPV2 (2 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["OPV3 (3 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["OPV3 (3 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["IPV1 (3 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["IPV1 (3 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["IPV2 (9 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["IPV2 (9 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["PCV1 (1 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["PCV1 (1 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["PCV2 (2 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["PCV2 (2 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["PCV3 (3 1/2 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["PCV3 (3 1/2 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["MCV1 (9 mos.)"]? 'vaccinated':'not-vaccinated'}">${c["MCV1 (9 mos.)"] || 'Not Vaccinated'}</span></td>
+          <td><span class="badge ${c["MCV2 (12 mos. & 29 days)"]? 'vaccinated':'not-vaccinated'}">${c["MCV2 (12 mos. & 29 days)"] || 'Not Vaccinated'}</span></td>
+          <td>${c.bhwEmail || ''}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderHome(){
+      document.getElementById('totalChildren').textContent = childrenData.length;
+      document.getElementById('totalBHWs').textContent = bhwProfiles.length;
+      document.getElementById('homeBarangay').textContent = loggedInUser.barangay || 'All';
+      document.getElementById('todayDate').textContent = new Date().toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+
+      // Scheduled visits (if MHO saved schedules to LS)
+      try {
+        const schedules = JSON.parse(localStorage.getItem('barangaySchedules') || '[]');
+        const today = new Date();
+        const count = schedules.filter(s => s.brgy === (loggedInUser.barangay || s.brgy) && new Date(s.date).getMonth() === today.getMonth() && new Date(s.date).getFullYear() === today.getFullYear()).length;
+        document.getElementById('scheduledVisits').textContent = count ? `${count} this month` : 'None this month';
+      } catch { document.getElementById('scheduledVisits').textContent = '—'; }
+
+      // Children needing vaccination
+      const needing = childrenData.filter(ch => {
+        let hasGap = false;
+        labelMap.forEach((_short, longKey) => { if(!isVaccinatedStatus(ch[longKey])) hasGap = true; });
+        return hasGap;
+      }).length;
+      document.getElementById('childrenNeeding').textContent = needing;
+    }
+
+    function renderBNSProfile(){
+      const user = loggedInUser || {};
+      document.getElementById('bnsName').textContent = user.name || 'BNS Staff';
+      document.getElementById('bnsEmail').textContent = user.email || 'n/a';
+      document.getElementById('bnsBarangayProfile').textContent = user.barangay || 'All Barangays';
+      document.getElementById('bnsSector').textContent = user.sector || 'N/A';
+    }
+
+    function renderProfileTable(){
+      const tbody = document.querySelector('#profileTable tbody');
+      tbody.innerHTML = '';
+      bhwProfiles.forEach(b => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${b.name}</td><td>${b.email}</td><td>${b.barangay}</td><td>${b.sector}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ===== Tabs =====
+    function openTab(tabId, btn){
+      document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    // ===== Download =====
+    function toggleDropdown(){ document.getElementById('downloadMenu').classList.toggle('show'); }
+    window.addEventListener('click', (event) => {
+      if (!event.target.closest('.dropdown')) document.querySelectorAll('.dropdown-content').forEach(menu => menu.classList.remove('show'));
+    });
+
+    function downloadReport(type){
+      if (filteredChildren.length === 0) { document.getElementById('noDataModal').style.display = 'block'; return; }
+      if (type === 'csv'){
+        const allKeys = new Set();
+        filteredChildren.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)));
+        const headers = Array.from(allKeys);
+        let csv = headers.join(',') + '\n';
+        filteredChildren.forEach(row => {
+          const values = headers.map(h => {
+            const val = row[h];
+            if (val === undefined || val === null) return '';
+            const s = String(val);
+            return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+          });
+          csv += values.join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'children_report.csv';
+        link.click();
+      } else if (type === 'xlsx'){
+        const ws = XLSX.utils.json_to_sheet(filteredChildren);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Report');
+        XLSX.writeFile(wb, 'children_report.xlsx');
+      } else if (type === 'pdf'){
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+        doc.setFontSize(14);
+        doc.text('Children Report', 40, 30);
+        const head = [Object.keys(filteredChildren[0])];
+        const body = filteredChildren.map(obj => head[0].map(h => obj[h] ?? ''));
+        doc.autoTable({ head, body, startY: 50, styles: { fontSize: 7, cellPadding: 2 }, headStyles: { fillColor: [67,160,71] } });
+        doc.save('children_report.pdf');
+      }
+    }
+
+    // ===== Logout & Modals =====
+    function logout(){ document.getElementById('logoutModal').style.display = 'block'; }
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('confirmLogout').addEventListener('click', () => {
+        localStorage.removeItem(LS.role);
+        localStorage.removeItem(LS.email);
+        localStorage.removeItem(LS.barangay);
+        localStorage.removeItem(LS.sector);
+        localStorage.removeItem('loggedInUser');
+        window.location.href = 'index.html';
+      });
+      document.getElementById('cancelLogout').addEventListener('click', () => {
+        document.getElementById('logoutModal').style.display = 'none';
+      });
+      document.getElementById('closeNoDataModal').addEventListener('click', () => {
+        document.getElementById('noDataModal').style.display = 'none';
+      });
+    });
+
+    // ===== Init =====
+    renderHome();
+    renderChildrenTable();
+    renderProfileTable();
+    renderBNSProfile();
+  </script>
+
+  <!-- Logout Modal -->
+  <div id="logoutModal" class="modal">
+    <div class="modal-content">
+      <p>Are you sure you want to log out?</p>
+      <button id="confirmLogout" class="bg-red-500 text-white px-6 py-2 rounded-md hover:bg-red-600">Yes</button>
+      <button id="cancelLogout" class="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600">No</button>
+    </div>
+  </div>
+
+  <!-- No Data Modal -->
+  <div id="noDataModal" class="modal">
+    <div class="modal-content">
+      <p>No data available for download.</p>
+      <button id="closeNoDataModal" class="bg-secondary text-white px-6 py-2 rounded-md hover:opacity-90">OK</button>
+    </div>
+  </div>
 </body>
 </html>
