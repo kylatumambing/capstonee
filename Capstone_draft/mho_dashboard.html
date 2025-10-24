@@ -64,6 +64,7 @@
       <div class="row mt-4">
         <div class="col card canvas-card"><h3>Vaccine Completion</h3><canvas id="pieChart" width="720" height="340"></canvas></div>
         <div class="col card canvas-card"><h3>Vaccines Given</h3><canvas id="barChart" width="720" height="340"></canvas></div>
+        <div class="col card canvas-card"><h3>Completion by Barangay</h3><canvas id="barangayChart" width="720" height="340"></canvas></div>
       </div>
       <div class="mt-4 card">
         <h3>Children Records</h3>
@@ -133,6 +134,144 @@
     const barangaySelect=document.getElementById('accountBarangay');
     const reportSelect=document.getElementById('barangaySelect');
     BARANGAYS.forEach(b=>{let o=document.createElement('option');o.value=b;o.textContent=b;barangaySelect.appendChild(o);let o2=document.createElement('option');o2.value=b;o2.textContent=b;reportSelect.appendChild(o2);});
+
+    // ===== MHO Analytics & Records (Aggregated) =====
+    const LS_DATA_PREFIX = "hp_children_";
+    const VACCINES = [
+      "BCG","HEPA B","PENTA 1","PENTA 2","PENTA 3",
+      "OPV1","OPV2","OPV3",
+      "IPV1","IPV2",
+      "PCV1","PCV2","PCV3",
+      "MCV1","MCV2"
+    ];
+
+    let currentMhoData = [];
+    let pieChartInstance = null;
+    let barChartInstance = null;
+    let barangayChartInstance = null;
+
+    function loadAllChildrenData() {
+      const profiles = JSON.parse(localStorage.getItem("bhwBnsProfiles") || "[]");
+      let all = [];
+
+      if (profiles.length > 0) {
+        profiles.filter(p => p.role === 'BHW').forEach(p => {
+          const sector = p.sector || 'Sector A';
+          const key = `${LS_DATA_PREFIX}${p.barangay}__${sector}`;
+          const list = JSON.parse(localStorage.getItem(key) || "[]");
+          list.forEach(row => {
+            if (!row.Barangay) row.Barangay = p.barangay;
+            if (!row.Sector) row.Sector = sector;
+            all.push(row);
+          });
+        });
+      } else {
+        // Fallback: scan localStorage for hp_children_ keys
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(LS_DATA_PREFIX)) {
+            try {
+              const list = JSON.parse(localStorage.getItem(k) || "[]");
+              const [, suffix] = k.split(LS_DATA_PREFIX);
+              const [brgy, sector] = (suffix || "__").split("__");
+              list.forEach(row => {
+                if (!row.Barangay) row.Barangay = brgy || '';
+                if (!row.Sector) row.Sector = sector || '';
+                all.push(row);
+              });
+            } catch {}
+          }
+        }
+      }
+      return all;
+    }
+
+    function renderMhoTable(data) {
+      const tbody = document.querySelector('#mhoTable tbody');
+      tbody.innerHTML = '';
+      if (!data.length) {
+        document.getElementById('mhoEmpty').style.display = 'block';
+        return;
+      }
+      document.getElementById('mhoEmpty').style.display = 'none';
+
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        const name = row["Child Name"] || row["Name"] || '';
+        const age = row["Age"] || row["Age in months"] || '';
+        const dob = row["Date of Birth"] || '';
+        const parent = row["Parent Name"] || row["Name of Mother"] || '';
+
+        tr.innerHTML = `
+          <td>${name}</td>
+          <td>${age}</td>
+          <td>${dob}</td>
+          <td>${parent}</td>
+          ${VACCINES.map(v => `<td><span class="badge ${row[v]==="Accepted"?"accepted":"needed"}">${row[v] || 'Needed'}</span></td>`).join('')}
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function isFullyVaccinated(row) {
+      return VACCINES.every(v => row[v] === 'Accepted');
+    }
+
+    function renderCharts(data) {
+      // Destroy previous instances to avoid duplicates
+      [pieChartInstance, barChartInstance, barangayChartInstance].forEach(inst => {
+        if (inst && typeof inst.destroy === 'function') inst.destroy();
+      });
+
+      const pieCtx = document.getElementById('pieChart').getContext('2d');
+      const fully = data.filter(isFullyVaccinated).length;
+      const notFully = Math.max(0, data.length - fully);
+      pieChartInstance = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Fully Vaccinated', 'Not Fully Vaccinated'],
+          datasets: [{ data: [fully, notFully], backgroundColor: ['#28a745', '#dc3545'] }]
+        },
+        options: { plugins: { legend: { position: 'bottom' } } }
+      });
+
+      const barCtx = document.getElementById('barChart').getContext('2d');
+      const acceptedCounts = VACCINES.map(v => data.reduce((acc, r) => acc + (r[v] === 'Accepted' ? 1 : 0), 0));
+      barChartInstance = new Chart(barCtx, {
+        type: 'bar',
+        data: { labels: VACCINES, datasets: [{ label: 'Accepted', data: acceptedCounts, backgroundColor: '#007bff' }] },
+        options: { indexAxis: 'x', plugins: { legend: { display: false } }, scales: { x: { ticks: { autoSkip: false } }, y: { beginAtZero: true } } }
+      });
+
+      const brgyStats = {};
+      data.forEach(r => {
+        const b = r.Barangay || 'Unknown';
+        if (!brgyStats[b]) brgyStats[b] = { total: 0, fully: 0 };
+        brgyStats[b].total += 1;
+        if (isFullyVaccinated(r)) brgyStats[b].fully += 1;
+      });
+      const brgys = Object.keys(brgyStats).sort();
+      const percents = brgys.map(b => brgyStats[b].total ? Math.round((brgyStats[b].fully / brgyStats[b].total) * 100) : 0);
+      const brgyCtx = document.getElementById('barangayChart').getContext('2d');
+      barangayChartInstance = new Chart(brgyCtx, {
+        type: 'bar',
+        data: { labels: brgys, datasets: [{ label: 'Fully Vaccinated %', data: percents, backgroundColor: '#43A047' }] },
+        options: { scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } }, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+
+    function renderReports() {
+      const all = loadAllChildrenData();
+      const selected = reportSelect.value;
+      const filtered = selected === 'all' ? all : all.filter(r => (r.Barangay || '').toLowerCase() === selected.toLowerCase());
+      currentMhoData = filtered;
+      renderMhoTable(filtered);
+      renderCharts(filtered);
+    }
+
+    reportSelect.addEventListener('change', renderReports);
+    // Initial render
+    renderReports();
 
     // Tabs
     document.querySelectorAll('.tab-btn').forEach(btn=>{
