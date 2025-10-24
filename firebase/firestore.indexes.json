@@ -1,0 +1,20 @@
+{
+  "indexes": [
+    {
+      "collectionId": "children",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "barangay", "order": "ASCENDING" },
+        { "fieldPath": "sector", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionId": "children",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "bhwEmail", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
