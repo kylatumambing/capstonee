@@ -144,6 +144,32 @@
       "PCV1","PCV2","PCV3",
       "MCV1","MCV2"
     ];
+    // Map short labels used in this page to detailed keys used by BHW data
+    const VACCINE_KEY_MAP = {
+      "BCG": "BCG (At Birth)",
+      "HEPA B": "HEPA B (At Birth)",
+      "PENTA 1": "PENTA 1 ( 1 1/2 mos.)",
+      "PENTA 2": "PENTA 2 ( 2 1/2 mos.)",
+      "PENTA 3": "PENTA 3 ( 3 1/2 mos.)",
+      "OPV1": "OPV 1  ( 1 1/2 mos.)",
+      "OPV2": "OPV 2  ( 2 1/2 mos.)",
+      "OPV3": "OPV 3  ( 3 1/2 mos.)",
+      "IPV1": "IPV1  ( 3 1/2 mos.)",
+      "IPV2": "IPV2  ( 9 mos.)",
+      "PCV1": "PCV1  ( 1 1/2 mos.)",
+      "PCV2": "PCV2  ( 2 1/2 mos.)",
+      "PCV3": "PCV3  ( 3 1/2 mos.)",
+      "MCV1": "MCV1 (9 mos.)",
+      "MCV2": "MCV2 (12 mos. & 29 days)"
+    };
+    function hasVaccine(row, shortKey){
+      const detailed = VACCINE_KEY_MAP[shortKey] || shortKey;
+      const val = row[detailed] ?? row[shortKey];
+      if (val == null) return false;
+      const s = String(val).trim();
+      if (!s) return false;
+      return s.toLowerCase() === 'accepted' || s.length > 0;
+    }
 
     let currentMhoData = [];
     let pieChartInstance = null;
@@ -197,24 +223,24 @@
 
       data.forEach(row => {
         const tr = document.createElement('tr');
-        const name = row["Child Name"] || row["Name"] || '';
-        const age = row["Age"] || row["Age in months"] || '';
+        const name = row["Name of Children"] || row["Child Name"] || row["Name"] || '';
+        const age = row["Age in Months"] || row["Age"] || row["Age in months"] || '';
         const dob = row["Date of Birth"] || '';
-        const parent = row["Parent Name"] || row["Name of Mother"] || '';
+        const parent = row["Name of Parent"] || row["Parent Name"] || row["Name of Mother"] || '';
 
         tr.innerHTML = `
           <td>${name}</td>
           <td>${age}</td>
           <td>${dob}</td>
           <td>${parent}</td>
-          ${VACCINES.map(v => `<td><span class="badge ${row[v]==="Accepted"?"accepted":"needed"}">${row[v] || 'Needed'}</span></td>`).join('')}
+          ${VACCINES.map(v => `<td><span class="badge ${hasVaccine(row, v)?'accepted':'needed'}">${hasVaccine(row, v) ? 'Accepted' : 'Needed'}</span></td>`).join('')}
         `;
         tbody.appendChild(tr);
       });
     }
 
     function isFullyVaccinated(row) {
-      return VACCINES.every(v => row[v] === 'Accepted');
+      return VACCINES.every(v => hasVaccine(row, v));
     }
 
     function renderCharts(data) {
@@ -236,7 +262,7 @@
       });
 
       const barCtx = document.getElementById('barChart').getContext('2d');
-      const acceptedCounts = VACCINES.map(v => data.reduce((acc, r) => acc + (r[v] === 'Accepted' ? 1 : 0), 0));
+      const acceptedCounts = VACCINES.map(v => data.reduce((acc, r) => acc + (hasVaccine(r, v) ? 1 : 0), 0));
       barChartInstance = new Chart(barCtx, {
         type: 'bar',
         data: { labels: VACCINES, datasets: [{ label: 'Accepted', data: acceptedCounts, backgroundColor: '#007bff' }] },
