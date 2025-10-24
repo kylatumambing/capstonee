@@ -1,315 +1,839 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>BHW Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="css/style.css">
-<style>
-.table-container th, .table-container td { 
-  padding: 6px 8px; font-size: 13px; text-align: left; border-bottom: 1px solid #ddd; 
-}
-.vaccine-btn { 
-  padding: 2px 6px; font-size: 12px; border-radius: 4px; cursor: pointer; border: none; 
-}
-.vaccine-btn.needed { background-color: #f39c12; color: white; }
-.vaccine-btn.accepted { background-color: #90ee90; color: black; }
-.new-child { background-color: #d0e7ff; } /* highlight for new children */
-</style>
+  <meta charset="UTF-8" />
+  <title>BHW Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Tailwind CSS & Fonts -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"/>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#90EE90",
+            secondary: "#43A047",
+            accent: "#A5D6A7",
+            "background-light": "#F9FAFB",
+            "background-dark": "#1F2937",
+            "text-light": "#1B5E20",
+            "text-dark": "#F9FAFB",
+          },
+          fontFamily: {
+            display: ["Roboto", "sans-serif"],
+            body: ["Lato", "sans-serif"],
+          },
+          borderRadius: { DEFAULT: "0.5rem", lg: "0.75rem", xl: "1rem", full: "9999px" },
+        },
+      },
+    };
+  </script>
+
+  <!-- Libs & Project styles -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="css/style.css" />
+
+  <style>
+    nav button.active { text-decoration: underline; }
+    .tab-content { display:none; margin-top:20px; }
+    .tab-content.active { display:block; }
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown-content { display:none; position:absolute; background-color:#fff; min-width:160px; box-shadow:0 2px 6px rgba(0,0,0,.2); z-index:10; border-radius:6px; overflow:hidden; }
+    .dropdown-content button { width:100%; padding:8px 12px; border:none; background:none; text-align:left; cursor:pointer; font-size:14px; }
+    .dropdown-content button:hover { background:#43A047; color:#fff; }
+    .show { display:block; }
+
+    .badge.vaccinated { background-color:#22c55e; color:#fff; padding:2px 6px; border-radius:3px; font-size:12px; }
+    .badge.not-vaccinated { background-color:#fbbf24; color:#000; padding:2px 6px; border-radius:3px; font-size:12px; }
+
+    .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background: rgba(0,0,0,0.5); }
+    .modal-content { background:#fff; margin:10% auto; padding:20px; border:1px solid #888; width:90%; max-width:420px; text-align:center; border-radius:8px; }
+    .new-child { background-color: #d0e7ff; }
+  </style>
 </head>
-<body>
-<header class="navbar">
-  <a href="bhw_dashboard.html" class="brand">
-    <img src="assets/logo.png" alt="Logo">
-    <span class="brand-name">HealthPro</span>
-  </a>
-  <nav>
-      <input type="text" id="searchName" placeholder="Search Name..." style="padding:5px; margin-left:10px;">
-      <button class="btn" onclick="searchByName()">Search</button>
-      <button class="btn" onclick="renderTable()">Reset</button>
-    <a href="login.html" class="btn danger">Logout</a>
-  </nav>
-</header>
+<body class="bg-background-light dark:bg-background-dark font-body text-text-light dark:text-text-dark">
 
-<main class="container">
-  <div class="dashboard-header">
-    <h2>BHW Dashboard</h2>
-  </div>
-
-  <div class="mt-4" style="display: flex; justify-content: space-between; align-items: center;">
-    <div>
-      <input type="file" id="fileInput" class="input" accept=".csv,.xlsx,.xls" style="display:none;">
-      <button class="btn" onclick="document.getElementById('fileInput').click()">Upload File</button>
+  <!-- Top bar -->
+  <header class="flex items-center justify-between whitespace-nowrap bg-primary px-6 py-4 shadow-md sticky top-0 z-50">
+    <div class="flex items-center gap-2 sm:gap-4 text-text-light dark:text-text-dark">
+      <span class="material-symbols-outlined text-3xl sm:text-4xl text-secondary">health_and_safety</span>
+      <h2 class="text-xl sm:text-2xl font-bold leading-tight tracking-[-0.015em] font-display">BHW Dashboard</h2>
     </div>
+    <nav class="flex items-center gap-4">
+      <button class="text-lg font-medium leading-normal hover:text-secondary transition-colors active" onclick="openTab('homeTab', this)">Home</button>
+      <button class="text-lg font-medium leading-normal hover:text-secondary transition-colors" onclick="openTab('childrenTab', this)">Children Records</button>
+      <button class="text-lg font-medium leading-normal hover:text-secondary transition-colors" onclick="openTab('profileTab', this)">Profile</button>
+      <button onclick="logout()" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 sm:h-12 sm:px-6 bg-secondary text-white text-sm sm:text-base font-bold leading-normal tracking-[0.015em] hover:opacity-90 transition-opacity">
+        <span class="truncate">Logout</span>
+      </button>
+    </nav>
+  </header>
 
-    <div>
-      <button class="btn" onclick="addNewChild()">+ Add Child</button>
-      <button class="btn" id="editTableBtn" onclick="editTable()">Edit Table</button>
-      <button class="btn" onclick="deleteSelected()">Delete Selected</button>
-      <button class="btn" onclick="saveTableEdits()">Save Changes</button>
+  <main class="container max-w-full mx-auto px-6 sm:px-10 py-10">
+    <h2 class="sr-only">BHW Dashboard</h2>
+
+    <!-- Home Tab -->
+    <section id="homeTab" class="tab-content active">
+      <!-- Hero -->
+      <div class="relative overflow-hidden rounded-xl bg-gradient-to-b from-secondary/80 to-secondary/30 h-48 sm:h-56 mb-8">
+        <div class="absolute inset-0 bg-[url('assets/logo_big.png')] bg-no-repeat bg-right-bottom opacity-10"></div>
+        <div class="h-full w-full flex items-center px-6 sm:px-10">
+          <div>
+            <h1 class="text-2xl sm:text-4xl font-display font-extrabold text-white drop-shadow-sm">Barangay Health Worker</h1>
+            <p class="text-white/95 text-sm sm:text-base mt-1">Serving the community with timely care and immunization.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mission & Snapshot -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-xl font-semibold mb-2">Mission & Vision</h3>
+            <p class="text-gray-700 dark:text-gray-200">We ensure every child in our barangay receives complete immunization and consistent health monitoring. We envision a resilient community with equitable access to primary healthcare.</p>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-xl font-semibold mb-4">Key Services</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="rounded-lg border border-gray-100 bg-gray-50 p-4"><h4 class="font-medium">Child Immunization</h4><p class="text-sm text-gray-600">Timely vaccines and follow-up schedules.</p></div>
+              <div class="rounded-lg border border-gray-100 bg-gray-50 p-4"><h4 class="font-medium">Nutrition Check</h4><p class="text-sm text-gray-600">Monitoring weight and development.</p></div>
+              <div class="rounded-lg border border-gray-100 bg-gray-50 p-4"><h4 class="font-medium">Community Visits</h4><p class="text-sm text-gray-600">Household health education and support.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+          <h3 class="text-xl font-semibold mb-2">Daily Snapshot</h3>
+          <dl class="divide-y divide-gray-100 dark:divide-gray-700">
+            <div class="flex items-center justify-between py-2"><dt class="text-gray-600">Today's Date</dt><dd id="todayDate" class="font-medium">—</dd></div>
+            <div class="flex items-center justify-between py-2"><dt class="text-gray-600">Your Barangay</dt><dd id="homeBarangay" class="font-medium">—</dd></div>
+            <div class="flex items-center justify-between py-2"><dt class="text-gray-600">Your Sector</dt><dd id="homeSector" class="font-medium">—</dd></div>
+            <div class="flex items-center justify-between py-2"><dt class="text-gray-600">Children Records</dt><dd id="totalChildren" class="font-bold text-secondary">0</dd></div>
+            <div class="flex items-center justify-between py-2"><dt class="text-gray-600">Children needing vaccination</dt><dd class="font-bold text-secondary"><span id="childrenNeeding">0</span></dd></div>
+          </dl>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Children Records Tab -->
+    <section id="childrenTab" class="tab-content">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <!-- Left: Search + Filter -->
+        <div class="flex items-center gap-2">
+          <input type="text" id="searchName" placeholder="Search by name" class="w-64 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:outline-none">
+          <button id="searchBtn" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-secondary transition">Search</button>
+          <button id="resetSearch" class="bg-gray-100 border border-gray-300 rounded-md px-3 py-2 text-sm" onclick="renderTable(filteredData)">Reset</button>
+        </div>
+
+        <!-- Right: Filter + Download -->
+        <div class="flex items-center gap-2">
+          <!-- Filter -->
+          <div class="relative inline-block">
+            <button class="btn bg-white border border-gray-300 rounded-md px-4 py-2" onclick="toggleFilterDropdown()">Filter ▼</button>
+            <div id="filterBar" style="display:none; position:absolute; right:0; z-index:20;">
+              <div class="bg-white shadow-md p-4 rounded-lg mt-2 relative w-[320px]">
+                <button onclick="toggleFilterDropdown()" class="absolute top-2 right-3 text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
+                <div class="flex gap-6 items-start">
+                  <div>
+                    <h4 class="font-medium text-sm mb-2 border-b">Year</h4>
+                    <div id="yearFilterContainer" class="space-y-1 max-h-80 overflow-y-auto pr-2"></div>
+                  </div>
+                  <div>
+                    <h4 class="font-medium text-sm mb-2 border-b">Month</h4>
+                    <div id="monthFilterContainer" class="space-y-1 max-h-80 overflow-y-auto pr-2"></div>
+                  </div>
+                </div>
+                <div class="flex gap-3 items-center mt-4">
+                  <button onclick="applyFilter()" class="bg-secondary text-white px-3 py-1 text-sm rounded-md hover:opacity-90 transition">Apply</button>
+                  <button onclick="clearFilter()" class="bg-gray-500 text-white px-3 py-1 text-sm rounded-md hover:bg-gray-600 transition">Clear</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Download -->
+          <div class="dropdown">
+            <button class="btn bg-white border border-gray-300 rounded-md px-4 py-2" onclick="toggleDownloadDropdown()">Download Data ▼</button>
+            <div class="dropdown-content" id="downloadMenu">
+              <button class="w-full text-left px-4 py-2 text-sm" onclick="downloadData('csv')">CSV</button>
+              <button class="w-full text-left px-4 py-2 text-sm" onclick="downloadData('excel')">Excel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="mt-4 flex items-center gap-2 flex-wrap">
+        <input type="file" id="fileInput" class="hidden" accept=".csv,.xlsx,.xls">
+        <button class="btn border border-gray-300 rounded-md px-4 py-2" onclick="openUploadModal()">Upload File</button>
+        <button class="btn border border-gray-300 rounded-md px-4 py-2" id="editBtn" onclick="toggleEditMode()">Edit</button>
+        <div id="editModeActions" style="display:none;" class="flex items-center gap-2">
+          <button class="btn bg-white border border-gray-300 rounded-md px-4 py-2 text-sm" onclick="confirmAddChild()">+ Add Child</button>
+          <button class="btn bg-white border border-gray-300 rounded-md px-4 py-2 text-sm" onclick="deleteSelected()">Delete Selected</button>
+          <button class="btn bg-white border border-gray-300 rounded-md px-4 py-2 text-sm" onclick="saveTableEdits()">Save Changes</button>
+        </div>
+      </div>
+
+      <!-- Optional filter indicator -->
+      <div id="filterInfo" class="text-sm text-gray-600 mt-2" style="display:none;"></div>
+
+      <!-- Report title (for filtered view) -->
+      <h3 id="reportDateTitle" class="text-xl font-semibold mt-6 mb-2" style="display:none;"></h3>
+
+      <!-- Table -->
+      <div class="table-container" style="overflow-x:auto; margin-top:10px;">
+        <table class="table" id="childrenTable">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+              <th>Name of Children</th>
+              <th>Age in Months</th>
+              <th>Date of Birth</th>
+              <th>Name of Parent</th>
+              <th>Report Date</th>
+              <th>BCG (At Birth)</th><th>HEPA B (At Birth)</th><th>PENTA 1 ( 1 1/2 mos.)</th><th>PENTA 2 ( 2 1/2 mos.)</th><th>PENTA 3 ( 3 1/2 mos.)</th>
+              <th>OPV 1  ( 1 1/2 mos.)</th><th>OPV 2  ( 2 1/2 mos.)</th><th>OPV 3  ( 3 1/2 mos.)</th><th>IPV1  ( 3 1/2 mos.)</th><th>IPV2  ( 9 mos.)</th>
+              <th>PCV1  ( 1 1/2 mos.)</th><th>PCV2  ( 2 1/2 mos.)</th><th>PCV3  ( 3 1/2 mos.)</th><th>MCV1 (9 mos.)</th><th>MCV2 (12 mos. & 29 days)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <p id="noRecords" style="display:none;">No records yet.</p>
+    </section>
+
+    <!-- Profile Tab -->
+    <section id="profileTab" class="tab-content">
+      <div class="bhw-profile-section mb-8 p-6 bg-gray-50 rounded-lg">
+        <h3 class="text-lg font-semibold mb-4">Your Profile (BHW)</h3>
+        <div id="bhwProfileInfo" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <p><strong>Name:</strong> <span id="bhwName">Loading…</span></p>
+          <p><strong>Email:</strong> <span id="bhwEmail">Loading…</span></p>
+          <p><strong>Barangay:</strong> <span id="bhwBarangay">Loading…</span></p>
+          <p><strong>Sector:</strong> <span id="bhwSector">Loading…</span></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Upload Modal -->
+  <div id="uploadModal" class="modal">
+    <div class="modal-content">
+      <h3 class="text-lg font-semibold mb-2">Select Report Period</h3>
+      <p class="text-sm text-gray-600 mb-4">Please select the month and year this report corresponds to.</p>
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div>
+          <label for="reportYearSelect" class="block text-sm font-medium text-left mb-1">Year:</label>
+          <select id="reportYearSelect" class="w-full p-2 border border-gray-300 rounded-md"></select>
+        </div>
+        <div>
+          <label for="reportMonthSelect" class="block text-sm font-medium text-left mb-1">Month:</label>
+          <select id="reportMonthSelect" class="w-full p-2 border border-gray-300 rounded-md"></select>
+        </div>
+      </div>
+      <div id="uploadWarning" class="text-sm text-amber-600 bg-amber-100 p-3 rounded-md mb-4" style="display:none;"></div>
+      <div>
+        <button id="proceedUploadBtn" class="bg-primary text-white px-6 py-2 rounded-md hover:bg-secondary transition">Proceed</button>
+        <button onclick="closeUploadModal()" class="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600 transition">Cancel</button>
+      </div>
     </div>
   </div>
 
-  <div class="table-container">
-    <table class="table" id="childrenTable">
-      <thead>
-        <tr>
-          <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
-          <th>Name</th><th>Age in Months</th><th>Date of Birth</th><th>Name of Parent</th><th>Barangay</th><th>Sector</th>
-          <th>BCG</th><th>HEPA B</th><th>PENTA 1</th><th>PENTA 2</th><th>PENTA 3</th>
-          <th>OPV1</th><th>OPV2</th><th>OPV3</th><th>IPV1</th><th>IPV2</th>
-          <th>PCV1</th><th>PCV2</th><th>PCV3</th><th>MCV1</th><th>MCV2</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+  <!-- Info Modal -->
+  <div id="infoModal" class="modal">
+    <div class="modal-content">
+      <p id="infoModalText" class="mb-4"></p>
+      <button onclick="document.getElementById('infoModal').style.display='none'" class="bg-primary text-white px-6 py-2 rounded-md hover:bg-secondary">OK</button>
+    </div>
   </div>
 
-  <div class="mt-4">
-    <label for="reportType">Download as:</label>
-    <select id="reportType" class="input mt-2">
-      <option value="csv">CSV</option>
-      <option value="xlsx">Excel (.xlsx)</option>
-    </select>
-    <button class="btn mt-3" onclick="downloadReport()">Download Report</button>
+  <!-- Confirm Cancel Modal -->
+  <div id="confirmCancelModal" class="modal">
+    <div class="modal-content">
+      <p id="confirmCancelText"></p>
+      <div class="mt-4">
+        <button id="confirmCancelBtn" class="bg-red-500 text-white px-6 py-2 rounded-md hover:bg-red-600">Yes, Proceed</button>
+        <button id="cancelActionBtn" class="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600">No, Go Back</button>
+      </div>
+    </div>
   </div>
-</main>
 
-<script>
-// Get logged-in BHW's barangay and sector
-const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
-const bhwBarangay = loggedInUser.barangay;
-const bhwSector = loggedInUser.sector;
-const bhwEmail = loggedInUser.email; // Get BHW's email
+  <!-- Delete Confirmation Modal -->
+  <div id="confirmDeleteModal" class="modal">
+    <div class="modal-content">
+      <p id="confirmDeleteText"></p>
+      <div class="mt-4">
+        <button id="confirmDeleteBtn" class="bg-red-500 text-white px-6 py-2 rounded-md hover:bg-red-600">Yes, Delete</button>
+        <button id="cancelDeleteBtn" class="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600">Cancel</button>
+      </div>
+    </div>
+  </div>
 
-// Use a specific key for children data based on BHW's barangay and sector
-const childrenDataKey = `hp_children_${bhwBarangay}__${bhwSector}`;
-let childrenData = JSON.parse(localStorage.getItem(childrenDataKey) || "[]");
+  <!-- Add Child Modal -->
+  <div id="addChildModal" class="modal">
+    <div class="modal-content">
+      <h3 class="text-lg font-semibold mb-4">Add New Child Record</h3>
+      <div id="addChildStep1">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+          <div>
+            <label class="block text-sm font-medium mb-1">Name of Children:</label>
+            <input type="text" id="newChildName" class="w-full p-2 border border-gray-300 rounded-md" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Age in Months:</label>
+            <input type="number" id="newChildAge" min="0" class="w-full p-2 border border-gray-300 rounded-md" required>
+          </div>
+          <div class="relative">
+            <label class="block text-sm font-medium mb-1">Date of Birth (mm/dd/yyyy):</label>
+            <input type="date" id="newChildDob" class="w-full p-2 border border-gray-300 rounded-md" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Name of Parent:</label>
+            <input type="text" id="newChildParent" class="w-full p-2 border border-gray-300 rounded-md" required>
+          </div>
+          <div class="md:col-span-2 relative">
+            <label class="block text-sm font-medium mb-1">Report Date (mm/yyyy):</label>
+            <input type="month" id="newChildReportDate" class="w-full p-2 border border-gray-300 rounded-md" required>
+          </div>
+        </div>
+      </div>
 
-let isEditing = false;
-renderTable();
+      <div id="addChildStep2" style="display:none;">
+        <div id="vaccineInputsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 text-left max-h-64 overflow-y-auto pr-2"></div>
+      </div>
 
-document.getElementById('fileInput').addEventListener('change', handleFile);
+      <div class="mt-6">
+        <button id="saveNewChildBtn" onclick="saveNewChild()" class="bg-primary text-white px-6 py-2 rounded-md hover:bg-secondary transition">Save Child</button>
+        <button onclick="closeAddChildModal()" class="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600 transition">Cancel</button>
+      </div>
+    </div>
+  </div>
 
-function normalizeVaccineValue(value){
-  if(!value) return "Needed";
-  value = value.toString().toLowerCase();
-  return value === "accepted" ? "Accepted" : "Needed";
-}
+  <!-- Logout Modal -->
+  <div id="logoutModal" class="modal">
+    <div class="modal-content">
+      <p>Are you sure you want to log out?</p>
+      <button id="confirmLogout" class="bg-red-500 text-white px-6 py-2 rounded-md hover:bg-red-600">Yes</button>
+      <button id="cancelLogout" class="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600">No</button>
+    </div>
+  </div>
 
-function handleFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
+  <script>
+    // ===== Constants =====
+    const MONTHS = [
+      { v: "01", l: "January" }, { v: "02", l: "February" }, { v: "03", l: "March" }, { v: "04", l: "April" },
+      { v: "05", l: "May" }, { v: "06", l: "June" }, { v: "07", l: "July" }, { v: "08", l: "August" },
+      { v: "09", l: "September" }, { v: "10", l: "October" }, { v: "11", l: "November" }, { v: "12", l: "December" }
+    ];
+    const YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025];
+    const LS = { role: "hp_role", email: "hp_email", barangay: "hp_barangay", sector: "hp_sector" };
 
-  reader.onload = e => {
-    let data;
-    if(file.name.toLowerCase().endsWith(".csv")){
-      data = parseCSV(e.target.result);
-    } else {
-      const array = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(array,{type:'array'});
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      data = XLSX.utils.sheet_to_json(worksheet,{defval:""});
+    // Logged-in user
+    const loggedInUser = JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+    const bhwBarangay = loggedInUser?.barangay || '';
+    const bhwSector = loggedInUser?.sector || '';
+    const bhwEmail = loggedInUser?.email || '';
+
+    // Storage key per BHW scope
+    const childrenDataKey = `hp_children_${bhwBarangay}__${bhwSector}`;
+    let childrenData = JSON.parse(localStorage.getItem(childrenDataKey) || "[]");
+    let filteredData = childrenData.slice();
+
+    // Editing states
+    let isEditing = false;
+    let hasUnsavedChanges = false;
+    let backupData = null;
+
+    // ===== Home rendering =====
+    function renderHome(){
+      document.getElementById('todayDate').textContent = new Date().toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+      document.getElementById('homeBarangay').textContent = bhwBarangay || '—';
+      document.getElementById('homeSector').textContent = bhwSector || '—';
+      document.getElementById('totalChildren').textContent = childrenData.length;
+      const needing = childrenData.filter(ch => {
+        const vaccineKeys = [
+          "BCG (At Birth)", "HEPA B (At Birth)", "PENTA 1 ( 1 1/2 mos.)", "PENTA 2 ( 2 1/2 mos.)", "PENTA 3 ( 3 1/2 mos.)",
+          "OPV 1  ( 1 1/2 mos.)", "OPV 2  ( 2 1/2 mos.)", "OPV 3  ( 3 1/2 mos.)", "IPV1  ( 3 1/2 mos.)", "IPV2  ( 9 mos.)",
+          "PCV1  ( 1 1/2 mos.)", "PCV2  ( 2 1/2 mos.)", "PCV3  ( 3 1/2 mos.)", "MCV1 (9 mos.)", "MCV2 (12 mos. & 29 days)"
+        ];
+        return vaccineKeys.some(k => !ch[k]);
+      }).length;
+      document.getElementById('childrenNeeding').textContent = needing;
     }
 
-    data.forEach(row => {
-      for(const key of Object.keys(row)){
-        if(["bcg","hepa b","penta 1","penta 2","penta 3","opv1","opv2","opv3","ipv1","ipv2","pcv1","pcv2","pcv3","mcv1","mcv2"].includes(key.toLowerCase())){
-          row[key] = normalizeVaccineValue(row[key]);
+    // ===== Filters UI =====
+    function setupFilterCheckboxes(containerId){
+      const container = document.getElementById(containerId);
+      if(!container) return;
+      const selectAll = container.querySelector('input[value="all"]');
+      const options = container.querySelectorAll('.filter-option');
+      if(!selectAll) return;
+      selectAll.addEventListener('change', () => { options.forEach(opt => opt.checked = selectAll.checked); });
+    }
+
+    (function mountFilterOptions(){
+      const y = document.getElementById('yearFilterContainer');
+      const m = document.getElementById('monthFilterContainer');
+      if(!y || !m) return;
+      y.innerHTML = `
+        <label class="flex items-center text-sm font-semibold">
+          <input type="checkbox" name="year" value="all" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary">
+          <span class="ml-2">Select All</span>
+        </label>`;
+      YEARS.forEach(Y => y.innerHTML += `
+        <label class="flex items-center text-sm">
+          <input type="checkbox" name="year" value="${Y}" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary filter-option">
+          <span class="ml-2">${Y}</span>
+        </label>`);
+      m.innerHTML = `
+        <label class="flex items-center text-sm font-semibold">
+          <input type="checkbox" name="month" value="all" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary">
+          <span class="ml-2">Select All</span>
+        </label>`;
+      MONTHS.forEach(M => m.innerHTML += `
+        <label class="flex items-center text-sm">
+          <input type="checkbox" name="month" value="${M.v}" class="h-4 w-4 rounded border-gray-300 text-secondary focus:ring-secondary filter-option">
+          <span class="ml-2">${M.l}</span>
+        </label>`);
+      setupFilterCheckboxes('yearFilterContainer');
+      setupFilterCheckboxes('monthFilterContainer');
+    })();
+
+    function toggleFilterDropdown(){
+      const d = document.getElementById('filterBar');
+      if(!d) return; d.style.display = d.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function formatReportDateForDisplay(reportDate){
+      if(!reportDate || !reportDate.includes('/')) return reportDate || '';
+      const [month, year] = reportDate.split('/');
+      const monthName = MONTHS.find(m => m.v === month)?.l || 'Unknown';
+      return `${monthName} ${year}`;
+    }
+
+    function applyFilter(){
+      const selectedYears = Array.from(document.querySelectorAll('#yearFilterContainer input.filter-option:checked')).map(cb => cb.value);
+      const selectedMonths = Array.from(document.querySelectorAll('#monthFilterContainer input.filter-option:checked')).map(cb => cb.value);
+      filteredData = childrenData.filter(child => {
+        const hasYear = selectedYears.length > 0;
+        const hasMonth = selectedMonths.length > 0;
+        if(!hasYear && !hasMonth) return true;
+        const rd = child["Report Date"] || '';
+        if(rd.includes('/')){
+          const [m, y] = rd.split('/');
+          const yOk = !hasYear || selectedYears.includes(y);
+          const mOk = !hasMonth || selectedMonths.includes(m);
+          return yOk && mOk;
         }
+        const dob = child["Date of Birth"] || '';
+        if(dob.includes('/')){
+          const parts = dob.split('/');
+          const m = parts[0].padStart(2,'0');
+          const y = parts[2];
+          const yOk = !hasYear || selectedYears.includes(y);
+          const mOk = !hasMonth || selectedMonths.includes(m);
+          return yOk && mOk;
+        }
+        return false;
+      });
+
+      // Filter info text
+      const info = document.getElementById('filterInfo');
+      const bits = [];
+      if(selectedYears.length) bits.push(`<strong>Year:</strong> ${selectedYears.join(', ')}`);
+      if(selectedMonths.length){ const names = selectedMonths.map(v => MONTHS.find(m => m.v === v)?.l || v); bits.push(`<strong>Months:</strong> ${names.join(', ')}`); }
+      if(bits.length){ info.innerHTML = `Filtering by: ${bits.join('; ')}`; info.style.display = 'block'; } else { info.style.display = 'none'; }
+
+      renderTable(filteredData);
+      toggleFilterDropdown();
+    }
+
+    function clearFilter(){
+      document.querySelectorAll('#filterBar input[type="checkbox"]').forEach(cb => cb.checked = false);
+      filteredData = childrenData.slice();
+      document.getElementById('filterInfo').style.display = 'none';
+      renderTable(filteredData);
+      toggleFilterDropdown();
+    }
+
+    // ===== Upload flow =====
+    function openUploadModal(){
+      const modal = document.getElementById('uploadModal');
+      const yearSelect = document.getElementById('reportYearSelect');
+      const monthSelect = document.getElementById('reportMonthSelect');
+      const warningDiv = document.getElementById('uploadWarning');
+      warningDiv.style.display = 'none';
+
+      if(yearSelect.options.length === 0){ YEARS.forEach(y => yearSelect.add(new Option(y, y))); }
+      if(monthSelect.options.length === 0){ MONTHS.forEach(m => monthSelect.add(new Option(m.l, m.v))); }
+
+      const now = new Date();
+      yearSelect.value = now.getFullYear();
+      monthSelect.value = String(now.getMonth()+1).padStart(2,'0');
+
+      const checkExistingData = () => {
+        const reportDate = `${monthSelect.value}/${yearSelect.value}`;
+        const hasData = childrenData.some(c => c["Report Date"] === reportDate);
+        if(hasData){ warningDiv.textContent = `Data for ${MONTHS.find(m=>m.v===monthSelect.value).l} ${yearSelect.value} already exists. Uploading will overwrite it.`; warningDiv.style.display = 'block'; }
+        else { warningDiv.style.display = 'none'; }
+      };
+      yearSelect.onchange = checkExistingData; monthSelect.onchange = checkExistingData; checkExistingData();
+      modal.style.display = 'block';
+    }
+    function closeUploadModal(){ document.getElementById('uploadModal').style.display = 'none'; }
+
+    document.getElementById('proceedUploadBtn').addEventListener('click', () => { document.getElementById('fileInput').click(); });
+    document.getElementById('fileInput').addEventListener('change', handleFile);
+
+    function parseCSV(text){
+      const rows = [];
+      let i=0,f="",r=[],q=false;
+      while(i<text.length){
+        const c=text[i];
+        if(c==='"'){ if(q && text[i+1]==='"'){ f+='"'; i++; } else q=!q; }
+        else if(c===',' && !q){ r.push(f); f=""; }
+        else if((c==='\n'||c==='\r') && !q){ if(f.length||r.length){ r.push(f); rows.push(r); f=""; r=[];} if(c==='\r' && text[i+1]==='\n')i++; }
+        else f+=c; i++;
       }
-      // Assign current BHW's barangay, sector, and email to imported children
-      row["Barangay"] = bhwBarangay;
-      row["Sector"] = bhwSector;
-      row["bhwEmail"] = bhwEmail; 
+      if(f.length||r.length){ r.push(f); rows.push(r);} 
+      const headers = rows[0].map(h => h.trim());
+      return rows.slice(1).map(values => headers.reduce((obj, header, idx) => { obj[header] = (values[idx]||'').trim(); return obj; }, {}));
+    }
+
+    function normalizeVaccineValue(v){ if(!v) return ""; const s=String(v).trim(); return s; }
+
+    function handleFile(e){
+      const file = e.target.files[0]; if(!file) return;
+      const reader = new FileReader();
+      const reportYear = document.getElementById('reportYearSelect').value;
+      const reportMonth = document.getElementById('reportMonthSelect').value;
+      const reportDate = `${reportMonth}/${reportYear}`;
+      const uploadTimestamp = new Date().toISOString();
+
+      reader.onload = ev => {
+        let data;
+        if(file.name.toLowerCase().endsWith('.csv')) data = parseCSV(ev.target.result);
+        else {
+          const array = new Uint8Array(ev.target.result);
+          const workbook = XLSX.read(array, { type:'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          data = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+        }
+        if(!data.length){ alert('No data in file.'); return; }
+
+        const expectedHeaders = [
+          "Name of Children", "Age in Months", "Date of Birth", "Name of Parent",
+          "BCG (At Birth)", "HEPA B (At Birth)", "PENTA 1 ( 1 1/2 mos.)", "PENTA 2 ( 2 1/2 mos.)", "PENTA 3 ( 3 1/2 mos.)",
+          "OPV 1  ( 1 1/2 mos.)", "OPV 2  ( 2 1/2 mos.)", "OPV 3  ( 3 1/2 mos.)", "IPV1  ( 3 1/2 mos.)", "IPV2  ( 9 mos.)",
+          "PCV1  ( 1 1/2 mos.)", "PCV2  ( 2 1/2 mos.)", "PCV3  ( 3 1/2 mos.)", "MCV1 (9 mos.)", "MCV2 (12 mos. & 29 days)"
+        ];
+        const fileHeaders = Object.keys(data[0]);
+        const missing = expectedHeaders.filter(h => !fileHeaders.includes(h));
+        if(missing.length){ alert('Invalid file format. Missing columns: ' + missing.join(', ')); return; }
+
+        // Remove existing data for this period
+        childrenData = childrenData.filter(c => c["Report Date"] !== reportDate);
+
+        data.forEach(row => {
+          row["Barangay"] = bhwBarangay; row["Sector"] = bhwSector; row["bhwEmail"] = bhwEmail;
+          row["Report Date"] = reportDate; row["Upload Date"] = uploadTimestamp;
+          // Normalize vaccine fields (keep date strings or empty)
+          expectedHeaders.slice(4).forEach(k => { row[k] = normalizeVaccineValue(row[k]); });
+        });
+
+        childrenData = childrenData.concat(data);
+        filteredData = childrenData.slice();
+        saveAndRender();
+        closeUploadModal();
+
+        const monthName = MONTHS.find(m => m.v === reportMonth).l;
+        document.getElementById('infoModalText').textContent = `Successfully uploaded ${data.length} records for ${monthName} ${reportYear}.`;
+        document.getElementById('infoModal').style.display = 'block';
+      };
+
+      if(file.name.toLowerCase().endsWith('.csv')) reader.readAsText(file);
+      else reader.readAsArrayBuffer(file);
+    }
+
+    function renderVaccineCell(name, row){
+      if (isEditing) {
+        return `<td><input type="text" value="${row[name] || ''}" placeholder="mm/dd/yyyy" class="vaccine-date-input" style="width:92px; border:1px solid #ccc; padding:2px; border-radius:3px;"></td>`;
+      } else {
+        const val = (row[name]||'').trim();
+        const value = val ? row[name] : 'Not Vaccinated';
+        return `<td><span class="badge ${val? 'vaccinated':'not-vaccinated'}">${value}</span></td>`;
+      }
+    }
+
+    function renderTable(dataToRender){
+      const tbody = document.querySelector('#childrenTable tbody');
+      tbody.innerHTML = '';
+      const data = dataToRender || childrenData;
+      document.getElementById('noRecords').style.display = data.length ? 'none' : 'block';
+      const selectAllTh = document.querySelector('#selectAll')?.parentElement; if(selectAllTh) selectAllTh.style.display = isEditing ? '' : 'none';
+      data.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.dataset.index = index; // index within current rendered dataset
+        if(row.newChild) tr.classList.add('new-child');
+        tr.innerHTML = `
+          <td style="display:${isEditing ? '' : 'none'}"><input type="checkbox" class="select-row"></td>
+          <td contenteditable="${isEditing}">${row["Name of Children"]||""}</td>
+          <td contenteditable="${isEditing}">${row["Age in Months"]||""}</td>
+          ${isEditing ? `<td><input type="text" value="${row["Date of Birth"]||''}" placeholder="mm/dd/yyyy" style="width:92px; border:1px solid #ccc; padding:2px; border-radius:3px;"></td>` : `<td>${row["Date of Birth"]||""}</td>`}
+          <td contenteditable="${isEditing}">${row["Name of Parent"]||""}</td>
+          <td>${formatReportDateForDisplay(row["Report Date"])}</td>
+          ${renderVaccineCell("BCG (At Birth)", row)}
+          ${renderVaccineCell("HEPA B (At Birth)", row)}
+          ${renderVaccineCell("PENTA 1 ( 1 1/2 mos.)", row)}
+          ${renderVaccineCell("PENTA 2 ( 2 1/2 mos.)", row)}
+          ${renderVaccineCell("PENTA 3 ( 3 1/2 mos.)", row)}
+          ${renderVaccineCell("OPV 1  ( 1 1/2 mos.)", row)}
+          ${renderVaccineCell("OPV 2  ( 2 1/2 mos.)", row)}
+          ${renderVaccineCell("OPV 3  ( 3 1/2 mos.)", row)}
+          ${renderVaccineCell("IPV1  ( 3 1/2 mos.)", row)}
+          ${renderVaccineCell("IPV2  ( 9 mos.)", row)}
+          ${renderVaccineCell("PCV1  ( 1 1/2 mos.)", row)}
+          ${renderVaccineCell("PCV2  ( 2 1/2 mos.)", row)}
+          ${renderVaccineCell("PCV3  ( 3 1/2 mos.)", row)}
+          ${renderVaccineCell("MCV1 (9 mos.)", row)}
+          ${renderVaccineCell("MCV2 (12 mos. & 29 days)", row)}
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function toggleEditMode(){
+      isEditing = !isEditing;
+      if(isEditing){ backupData = JSON.parse(JSON.stringify(childrenData)); }
+      updateButtonState(); renderTable(filteredData);
+    }
+    function cancelEdit(){
+      if(hasUnsavedChanges){
+        const modal = document.getElementById('confirmCancelModal');
+        document.getElementById('confirmCancelText').textContent = 'Are you sure you want to cancel? All unsaved changes will be lost.';
+        document.getElementById('confirmCancelBtn').onclick = () => {
+          if(backupData) childrenData = JSON.parse(JSON.stringify(backupData));
+          isEditing = false; hasUnsavedChanges = false; backupData = null; updateButtonState(); renderTable(childrenData);
+          modal.style.display = 'none';
+        };
+        document.getElementById('cancelActionBtn').onclick = () => { modal.style.display = 'none'; };
+        modal.style.display = 'block';
+        return;
+      }
+      if(backupData) childrenData = JSON.parse(JSON.stringify(backupData));
+      isEditing = false; hasUnsavedChanges = false; updateButtonState(); renderTable(childrenData);
+    }
+    function updateButtonState(){
+      const editBtn = document.getElementById('editBtn');
+      const editActions = document.getElementById('editModeActions');
+      if(isEditing){ editBtn.textContent = 'Cancel'; editBtn.onclick = cancelEdit; editActions.style.display = 'flex'; }
+      else { editBtn.textContent = 'Edit'; editBtn.onclick = toggleEditMode; editActions.style.display = 'none'; }
+    }
+
+    function confirmAddChild(){ openAddChildModal(); }
+    function openAddChildModal(){
+      document.getElementById('addChildModal').style.display = 'block';
+      const vaccineContainer = document.getElementById('vaccineInputsContainer');
+      if(vaccineContainer.innerHTML === ''){
+        const vaccineList = [
+          "BCG (At Birth)", "HEPA B (At Birth)", "PENTA 1 ( 1 1/2 mos.)", "PENTA 2 ( 2 1/2 mos.)", "PENTA 3 ( 3 1/2 mos.)",
+          "OPV 1  ( 1 1/2 mos.)", "OPV 2  ( 2 1/2 mos.)", "OPV 3  ( 3 1/2 mos.)", "IPV1  ( 3 1/2 mos.)", "IPV2  ( 9 mos.)",
+          "PCV1  ( 1 1/2 mos.)", "PCV2  ( 2 1/2 mos.)", "PCV3  ( 3 1/2 mos.)", "MCV1 (9 mos.)", "MCV2 (12 mos. & 29 days)"
+        ];
+        vaccineList.forEach(v => {
+          vaccineContainer.innerHTML += `
+            <div class="relative">
+              <label class="block text-sm font-medium mb-1">${v}:</label>
+              <input type="date" data-vaccine-name="${v}" class="w-full p-2 border border-gray-300 rounded-md vaccine-date-input" placeholder="mm/dd/yyyy">
+            </div>`;
+        });
+      }
+    }
+    function closeAddChildModal(){
+      document.getElementById('addChildModal').style.display = 'none';
+      document.getElementById('newChildName').value = '';
+      document.getElementById('newChildAge').value = '';
+      document.getElementById('newChildDob').value = '';
+      document.getElementById('newChildParent').value = '';
+      document.getElementById('newChildReportDate').value = '';
+      document.querySelectorAll('#vaccineInputsContainer input').forEach(i => i.value = '');
+    }
+
+    function isValidDate(dateString){
+      if(!/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) return false;
+      const [m,d,y] = dateString.split('/').map(n => parseInt(n,10));
+      if(y < 1900 || y > 2100 || m === 0 || m > 12) return false;
+      const monthLength=[31,28,31,30,31,30,31,31,30,31,30,31];
+      if(y%400===0 || (y%100!==0 && y%4===0)) monthLength[1]=29;
+      return d>0 && d<=monthLength[m-1];
+    }
+    function isValidReportDate(dateString){ return /^\d{2}\/\d{4}$/.test(dateString) && YEARS.includes(parseInt(dateString.split('/')[1],10)); }
+    function formatDateFromPicker(yyyy_mm_dd){ if(!yyyy_mm_dd) return ''; const [Y,M,D]=yyyy_mm_dd.split('-'); return `${M}/${D}/${Y}`; }
+    function formatMonthFromPicker(yyyy_mm){ if(!yyyy_mm) return ''; const [Y,M]=yyyy_mm.split('-'); return `${M}/${Y}`; }
+
+    function saveNewChild(){
+      const name = document.getElementById('newChildName').value.trim();
+      const age = document.getElementById('newChildAge').value.trim();
+      const dob = formatDateFromPicker(document.getElementById('newChildDob').value);
+      const parent = document.getElementById('newChildParent').value.trim();
+      const reportDate = formatMonthFromPicker(document.getElementById('newChildReportDate').value);
+      if(!name || !age || !dob || !parent || !reportDate){ alert('Please fill all required fields: Name, Age, DOB, Parent, and Report Date.'); return; }
+      if(!isValidDate(dob)){ alert(`Invalid Date of Birth format for "${name}". Please use mm/dd/yyyy.`); return; }
+      if(!isValidReportDate(reportDate)){ alert(`Invalid Report Date format for "${name}". Please use mm/yyyy.`); return; }
+
+      const newChild = {
+        "Name of Children": name,
+        "Age in Months": age,
+        "Date of Birth": dob,
+        "Name of Parent": parent,
+        "Report Date": reportDate,
+        "Barangay": bhwBarangay,
+        "Sector": bhwSector,
+        "bhwEmail": bhwEmail,
+        "Upload Date": new Date().toISOString(),
+        "newChild": true
+      };
+      document.querySelectorAll('#vaccineInputsContainer input').forEach(input => {
+        const vaccineName = input.dataset.vaccineName; newChild[vaccineName] = formatDateFromPicker(input.value);
+      });
+      childrenData.push(newChild); filteredData = childrenData.slice(); hasUnsavedChanges = true; saveAndRender(); closeAddChildModal();
+    }
+
+    function getCellVaccineValue(cell){
+      const input = cell.querySelector('input');
+      if(input) return input.value.trim();
+      const text = cell.innerText.trim();
+      return text === 'Not Vaccinated' ? '' : text;
+    }
+
+    function saveTableEdits(){
+      const rows = Array.from(document.querySelectorAll('#childrenTable tbody tr'));
+      // Map back from filteredData indices to childrenData objects for safe update
+      const updated = [];
+      for(const tr of rows){
+        const idx = parseInt(tr.dataset.index,10);
+        const base = (filteredData[idx]) || {};
+        const cells = tr.querySelectorAll('td');
+        const name = cells[1].innerText.trim();
+        const age = cells[2].innerText.trim();
+        const dob = cells[3].querySelector('input') ? cells[3].querySelector('input').value.trim() : cells[3].innerText.trim();
+        const parent = cells[4].innerText.trim();
+        if(!name || !age || !dob || !parent){ alert(`Please fill all required fields (Name, Age, DOB, Parent) for "${name||'the child'}".`); return; }
+        if(!isValidDate(dob)){ alert(`Invalid Date of Birth format for "${name}". Please use mm/dd/yyyy.`); return; }
+        const upd = {
+          ...base,
+          "Name of Children": name,
+          "Age in Months": age,
+          "Date of Birth": dob,
+          "Name of Parent": parent,
+          "BCG (At Birth)": getCellVaccineValue(cells[6]),
+          "HEPA B (At Birth)": getCellVaccineValue(cells[7]),
+          "PENTA 1 ( 1 1/2 mos.)": getCellVaccineValue(cells[8]),
+          "PENTA 2 ( 2 1/2 mos.)": getCellVaccineValue(cells[9]),
+          "PENTA 3 ( 3 1/2 mos.)": getCellVaccineValue(cells[10]),
+          "OPV 1  ( 1 1/2 mos.)": getCellVaccineValue(cells[11]),
+          "OPV 2  ( 2 1/2 mos.)": getCellVaccineValue(cells[12]),
+          "OPV 3  ( 3 1/2 mos.)": getCellVaccineValue(cells[13]),
+          "IPV1  ( 3 1/2 mos.)": getCellVaccineValue(cells[14]),
+          "IPV2  ( 9 mos.)": getCellVaccineValue(cells[15]),
+          "PCV1  ( 1 1/2 mos.)": getCellVaccineValue(cells[16]),
+          "PCV2  ( 2 1/2 mos.)": getCellVaccineValue(cells[17]),
+          "PCV3  ( 3 1/2 mos.)": getCellVaccineValue(cells[18]),
+          "MCV1 (9 mos.)": getCellVaccineValue(cells[19]),
+          "MCV2 (12 mos. & 29 days)": getCellVaccineValue(cells[20]),
+          "bhwEmail": bhwEmail
+        };
+        updated.push({ base, upd });
+      }
+      // Apply updates back to master array by identity
+      updated.forEach(({base, upd}) => {
+        const masterIdx = childrenData.indexOf(base);
+        if(masterIdx !== -1) childrenData[masterIdx] = upd;
+      });
+      localStorage.setItem(childrenDataKey, JSON.stringify(childrenData));
+      isEditing = false; hasUnsavedChanges = false; backupData = null; updateButtonState(); filteredData = childrenData.slice(); renderTable(childrenData);
+      document.getElementById('infoModalText').textContent = 'Changes saved successfully!';
+      document.getElementById('infoModal').style.display = 'block';
+    }
+
+    function deleteSelected(){
+      const rows = Array.from(document.querySelectorAll('#childrenTable tbody tr'));
+      const selected = rows.filter(tr => tr.querySelector('.select-row')?.checked);
+      if(!selected.length){ document.getElementById('infoModalText').textContent = 'No children selected!'; document.getElementById('infoModal').style.display = 'block'; return; }
+      const modal = document.getElementById('confirmDeleteModal');
+      document.getElementById('confirmDeleteText').textContent = `Are you sure you want to delete ${selected.length} selected record(s)?`;
+      document.getElementById('confirmDeleteBtn').onclick = () => {
+        // Delete by identity mapping from filteredData
+        const toDelete = new Set(selected.map(tr => filteredData[parseInt(tr.dataset.index,10)]));
+        childrenData = childrenData.filter(ch => !toDelete.has(ch));
+        filteredData = filteredData.filter(ch => !toDelete.has(ch));
+        saveAndRender(); hasUnsavedChanges = true; modal.style.display = 'none';
+      };
+      document.getElementById('cancelDeleteBtn').onclick = () => { modal.style.display = 'none'; };
+      modal.style.display = 'block';
+    }
+
+    function toggleSelectAll(cb){ document.querySelectorAll('.select-row').forEach(x => x.checked = cb.checked); }
+
+    // Search behavior
+    const searchInput = document.getElementById('searchName');
+    const searchBtn = document.getElementById('searchBtn');
+    if(searchInput && searchBtn){
+      const doSearch = () => { const t = searchInput.value.toLowerCase().trim(); if(!t){ renderTable(filteredData); return; } const s = filteredData.filter(c => (c["Name of Children"]||"").toLowerCase().includes(t)); renderTable(s); };
+      searchBtn.addEventListener('click', doSearch);
+      searchInput.addEventListener('keydown', e => { if(e.key === 'Enter') doSearch(); });
+      searchInput.addEventListener('input', () => { if(!searchInput.value.trim()) renderTable(filteredData); });
+    }
+
+    function saveAndRender(){ localStorage.setItem(childrenDataKey, JSON.stringify(childrenData)); renderTable(childrenData); renderHome(); }
+
+    function toCSVQuoted(rows){
+      return rows.map(r => r.map(v => {
+        const s = v == null ? '' : String(v);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+      }).join(',')).join('\n');
+    }
+    function downloadData(type){
+      const data = filteredData.length ? filteredData : childrenData;
+      if(!data.length){ alert('No data to download!'); return; }
+      if(type === 'csv'){
+        const allKeys = new Set(); data.forEach(r => Object.keys(r).forEach(k => allKeys.add(k)));
+        const headers = Array.from(allKeys);
+        const rows = [headers, ...data.map(obj => headers.map(h => obj[h] ?? ''))];
+        const csv = toCSVQuoted(rows);
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'children_report.csv'; link.click();
+      } else {
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Report'); XLSX.writeFile(wb, 'children_report.xlsx');
+      }
+    }
+    function toggleDownloadDropdown(){ document.getElementById('downloadMenu').classList.toggle('show'); }
+    window.addEventListener('click', (e) => { if(!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown-content').forEach(m => m.classList.remove('show')); });
+
+    // Tabs & Profile
+    function openTab(tabId, btn){ document.querySelectorAll('nav button').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); document.getElementById(tabId).classList.add('active'); btn.classList.add('active'); }
+    function renderBHWProfile(){ const u = loggedInUser || {}; document.getElementById('bhwName').textContent = u.name || 'BHW Staff'; document.getElementById('bhwEmail').textContent = u.email || 'n/a'; document.getElementById('bhwBarangay').textContent = u.barangay || '—'; document.getElementById('bhwSector').textContent = u.sector || '—'; }
+    function logout(){ document.getElementById('logoutModal').style.display = 'block'; }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Logout modal
+      document.getElementById('confirmLogout').addEventListener('click', () => {
+        localStorage.removeItem(LS.role); localStorage.removeItem(LS.email); localStorage.removeItem(LS.barangay); localStorage.removeItem(LS.sector); localStorage.removeItem('loggedInUser');
+        window.location.href = 'index.html';
+      });
+      document.getElementById('cancelLogout').addEventListener('click', () => { document.getElementById('logoutModal').style.display = 'none'; });
+
+      renderBHWProfile(); renderHome(); renderTable(childrenData);
     });
-
-    childrenData = data;
-    saveAndRender();
-  };
-
-  if(file.name.toLowerCase().endsWith(".csv")) reader.readAsText(file);
-  else reader.readAsArrayBuffer(file);
-}
-
-function parseCSV(text){
-  const lines=text.trim().split("\n");
-  const headers=lines[0].split(",").map(h=>h.trim());
-  return lines.slice(1).map(line=>{
-    const values=line.split(",");
-    return headers.reduce((obj, header,i)=>{
-      obj[header]=values[i]?values[i].trim():"";
-      return obj;
-    },{});
-  });
-}
-
-function renderVaccineCell(name,row){
-  const value = normalizeVaccineValue(row[name]);
-  const cls = value==="Accepted"?"accepted":"needed";
-  return `<td><button class="vaccine-btn ${cls}" ${isEditing ? "" : "disabled"} onclick="toggleVaccine(this)">${value}</button></td>`;
-}
-
-function renderTable(filteredData){
-  const tbody = document.querySelector("#childrenTable tbody");
-  tbody.innerHTML="";
-  const data = filteredData || childrenData;
-  data.forEach((row,index)=>{
-    const tr=document.createElement("tr");
-    tr.dataset.index=index;
-    if(row.newChild) tr.classList.add("new-child"); 
-    tr.innerHTML=`
-      <td><input type="checkbox" class="select-row"></td>
-      <td contenteditable="${isEditing}">${row["Name"]||""}</td>
-      <td contenteditable="${isEditing}">${row["Age in Months"]||""}</td>
-      <td contenteditable="${isEditing}">${row["Date of Birth"]||""}</td>
-      <td contenteditable="${isEditing}">${row["Name of Parent"]||""}</td>
-      <td contenteditable="${isEditing}">${row["Barangay"]||""}</td>
-      <td contenteditable="${isEditing}">${row["Sector"]||""}</td>
-      ${renderVaccineCell("BCG", row)}
-      ${renderVaccineCell("HEPA B", row)}
-      ${renderVaccineCell("PENTA 1", row)}
-      ${renderVaccineCell("PENTA 2", row)}
-      ${renderVaccineCell("PENTA 3", row)}
-      ${renderVaccineCell("OPV1", row)}
-      ${renderVaccineCell("OPV2", row)}
-      ${renderVaccineCell("OPV3", row)}
-      ${renderVaccineCell("IPV1", row)}
-      ${renderVaccineCell("IPV2", row)}
-      ${renderVaccineCell("PCV1", row)}
-      ${renderVaccineCell("PCV2", row)}
-      ${renderVaccineCell("PCV3", row)}
-      ${renderVaccineCell("MCV1", row)}
-      ${renderVaccineCell("MCV2", row)}
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-function addNewChild(){
-  const newChild={
-    "Name":"","Age in Months":"","Date of Birth":"","Name of Parent":"",
-    "Barangay": bhwBarangay, // Auto-fill barangay
-    "Sector": bhwSector,     // Auto-fill sector
-    "bhwEmail": bhwEmail,    // Auto-fill BHW email
-    "BCG":"Needed","HEPA B":"Needed","PENTA 1":"Needed","PENTA 2":"Needed","PENTA 3":"Needed",
-    "OPV1":"Needed","OPV2":"Needed","OPV3":"Needed","IPV1":"Needed","IPV2":"Needed",
-    "PCV1":"Needed","PCV2":"Needed","PCV3":"Needed","MCV1":"Needed","MCV2":"Needed",
-    "newChild": true
-  };
-  childrenData.unshift(newChild);
-  saveAndRender();
-}
-
-function editTable(){
-  isEditing = true;
-  const btn = document.getElementById("editTableBtn");
-  btn.style.backgroundColor = "#28a745"; // green
-  btn.style.color = "white";
-  renderTable();
-}
-
-function toggleVaccine(btn){
-  if(btn.disabled) return;
-  if(btn.innerText==="Needed"){
-    btn.innerText="Accepted";
-    btn.classList.remove("needed");
-    btn.classList.add("accepted");
-  } else {
-    btn.innerText="Needed";
-    btn.classList.remove("accepted");
-    btn.classList.add("needed");
-  }
-}
-
-function saveTableEdits(){
-  const tbody=document.querySelector("#childrenTable tbody");
-  const rows=tbody.querySelectorAll("tr");
-  childrenData=Array.from(rows).map(tr=>{
-    const cells=tr.querySelectorAll("td");
-    const child = {
-      "Name":cells[1].innerText.trim(),
-      "Age in Months":cells[2].innerText.trim(),
-      "Date of Birth":cells[3].innerText.trim(),
-      "Name of Parent":cells[4].innerText.trim(),
-      "Barangay":cells[5].innerText.trim(),
-      "Sector":cells[6].innerText.trim(),
-      "BCG":cells[7].querySelector("button")?.innerText.trim()||"Needed",
-      "HEPA B":cells[8].querySelector("button")?.innerText.trim()||"Needed",
-      "PENTA 1":cells[9].querySelector("button")?.innerText.trim()||"Needed",
-      "PENTA 2":cells[10].querySelector("button")?.innerText.trim()||"Needed",
-      "PENTA 3":cells[11].querySelector("button")?.innerText.trim()||"Needed",
-      "OPV1":cells[12].querySelector("button")?.innerText.trim()||"Needed",
-      "OPV2":cells[13].querySelector("button")?.innerText.trim()||"Needed",
-      "OPV3":cells[14].querySelector("button")?.innerText.trim()||"Needed",
-      "IPV1":cells[15].querySelector("button")?.innerText.trim()||"Needed",
-      "IPV2":cells[16].querySelector("button")?.innerText.trim()||"Needed",
-      "PCV1":cells[17].querySelector("button")?.innerText.trim()||"Needed",
-      "PCV2":cells[18].querySelector("button")?.innerText.trim()||"Needed",
-      "PCV3":cells[19].querySelector("button")?.innerText.trim()||"Needed",
-      "MCV1":cells[20].querySelector("button")?.innerText.trim()||"Needed",
-      "MCV2":cells[21].querySelector("button")?.innerText.trim()||"Needed",
-      "bhwEmail": bhwEmail // Ensure BHW email is saved with the child record
-    };
-    if(tr.classList.contains("new-child")) tr.classList.remove("new-child");
-    return child;
-  });
-  isEditing = false;
-  const btn = document.getElementById("editTableBtn");
-  btn.style.backgroundColor = ""; // reset color
-  btn.style.color = "";
-  saveAndRender();
-  alert("Changes saved!");
-}
-
-function deleteSelected(){
-  const selectedIndexes=[];
-  document.querySelectorAll("#childrenTable tbody tr").forEach((tr,index)=>{
-    if(tr.querySelector(".select-row").checked) selectedIndexes.push(index);
-  });
-  if(selectedIndexes.length===0){ alert("No children selected!"); return; }
-  if(confirm(`Are you sure you want to delete ${selectedIndexes.length} child(ren)?`)){
-    selectedIndexes.sort((a,b)=>b-a).forEach(i=>childrenData.splice(i,1));
-    saveAndRender();
-  }
-}
-
-function searchByName(){
-  const term=document.getElementById("searchName").value.toLowerCase().trim();
-  if(!term){ renderTable(); return; }
-  const filtered=childrenData.filter(c=> (c["Name"]||"").toLowerCase().includes(term));
-  renderTable(filtered);
-}
-
-function saveAndRender(){
-  localStorage.setItem(childrenDataKey,JSON.stringify(childrenData));
-  renderTable();
-}
-
-function downloadReport(){
-  if(childrenData.length===0){alert("No data to download!");return;}
-  const type=document.getElementById("reportType").value;
-  if(type==="csv"){
-    // Include bhwEmail in CSV export
-    let csv=Object.keys(childrenData[0]).join(",")+"\n";
-    childrenData.forEach(row=>csv+=Object.values(row).join(",")+"\n");
-    const blob=new Blob([csv],{type:"text/csv"});
-    const link=document.createElement("a");
-    link.href=URL.createObjectURL(blob);
-    link.download="children_report.csv";
-    link.click();
-  } else {
-    const ws=XLSX.utils.json_to_sheet(childrenData);
-    const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,"Report");
-    XLSX.writeFile(wb,"children_report.xlsx");
-  }
-}
-
-function toggleSelectAll(checkbox){
-  document.querySelectorAll(".select-row").forEach(cb=>cb.checked=checkbox.checked);
-}
-</script>
+  </script>
 </body>
 </html>
